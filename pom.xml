@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.0</version> <!-- lookup parent from repository -->
+		<version>4.1.2</version> <!-- lookup parent from repository -->
 	</parent>
 
 	<groupId>com.arcadiaeditions</groupId>
@@ -19,19 +19,27 @@
 
 		<basePackage>com.arcadiaeditions.orders.checkout</basePackage>
 		<openApiApiPackage>${basePackage}.adapters.web</openApiApiPackage>
-		<openApiModelPackage>${basePackage}.adapters.web.model</openApiModelPackage>
+		<openApiModelPackage>${basePackage}.adapters.web.dtos</openApiModelPackage>
 
-		<asyncapi.inputSpec>${project.basedir}/src/main/resources/public/apis/asyncapi.yml</asyncapi.inputSpec>
-		<asyncApiModelPackage>${basePackage}.events.dtos</asyncApiModelPackage>
-		<asyncApiProducerApiPackage>${basePackage}.events</asyncApiProducerApiPackage>
-		<asyncApiConsumerApiPackage>${basePackage}.commands</asyncApiConsumerApiPackage>
+		<openapi.inputSpec>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/openapi.yml</openapi.inputSpec>
+		<asyncapi.inputSpec>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/asyncapi.yml</asyncapi.inputSpec>
+		<!-- avro types referenced by name from the event schemas (comma separated, order matters: dependencies first) -->
+		<asyncapi.avro.imports>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/avro/StockUnavailableItem.avsc,https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/avro/OrderConfirmedItem.avsc,https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/avro/OrderConfirmedShippingAddress.avsc</asyncapi.avro.imports>
+		<asyncApiModelPackage>${basePackage}.asyncapi.provider.dtos</asyncApiModelPackage>
+		<asyncApiProducerApiPackage>${basePackage}.asyncapi.provider</asyncApiProducerApiPackage>
+		<asyncApiConsumerApiPackage>${basePackage}.asyncapi.provider</asyncApiConsumerApiPackage>
+		<asyncapi.client.inputSpec>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/asyncapi-client.yml</asyncapi.client.inputSpec>
+		<!-- avro types referenced by name from the consumed event schemas (dependencies first) -->
+		<asyncapi.client.avro.imports>https://raw.githubusercontent.com/arcadia-editions/catalog-inventory-api/refs/heads/main/avro/StockReleaseReason.avsc,https://raw.githubusercontent.com/arcadia-editions/catalog-inventory-api/refs/heads/main/avro/StockReleasedItem.avsc</asyncapi.client.avro.imports>
+		<!-- generated AsyncAPI SDK lives outside the hexagon: asyncapi.provider (asyncapi.yml) and asyncapi.client (asyncapi-client.yml) -->
+		<asyncApiClientApiPackage>${basePackage}.asyncapi.client</asyncApiClientApiPackage>
 
 		<spring-boot.version>${project.parent.version}</spring-boot.version>
-		<spring-cloud.version>2025.1.0</spring-cloud.version>
+		<spring-cloud.version>2025.1.4</spring-cloud.version>
 		<avro.version>1.11.1</avro.version>
 
 
-		<zenwave.version>2.6.0</zenwave.version>
+		<zenwave.version>2.8.1</zenwave.version>
 		<openapi-generator-maven-plugin.version>7.17.0</openapi-generator-maven-plugin.version>
 
 		<jakarta.validation-api.version>3.1.1</jakarta.validation-api.version>
@@ -41,7 +49,7 @@
 		<archunit-junit5.version>1.4.1</archunit-junit5.version>
 		<springdoc-openapi-starter-webmvc-ui.version>2.8.3</springdoc-openapi-starter-webmvc-ui.version>
 		<spotless-maven-plugin.version>2.44.3</spotless-maven-plugin.version>
-		<palantir-java-format.version>2.55.0</palantir-java-format.version>
+		<palantir-java-format.version>2.80.0</palantir-java-format.version>
 		<spring-javaformat-maven-plugin.version>0.0.43</spring-javaformat-maven-plugin.version>
 	</properties>
 
@@ -307,7 +315,7 @@
 						</goals>
 						<phase>generate-sources</phase>
 						<configuration>
-							<inputSpec>${project.basedir}/src/main/resources/public/apis/openapi.yml</inputSpec>
+							<inputSpec>${openapi.inputSpec}</inputSpec>
 							<skipIfSpecIsUnchanged>true</skipIfSpecIsUnchanged>
 							<generatorName>spring</generatorName>
 							<apiPackage>${openApiApiPackage}</apiPackage>
@@ -333,63 +341,65 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>io.zenwave360.sdk</groupId>
+				<artifactId>zenwave-sdk-maven-plugin</artifactId>
+				<version>${zenwave.version}</version>
+				<configuration>
+					<inputSpec>${asyncapi.inputSpec}</inputSpec>
+					<skip>false</skip>
+					<addCompileSourceRoot>true</addCompileSourceRoot>
+					<addTestCompileSourceRoot>true</addTestCompileSourceRoot>
+					<!-- <authentication> -->
+					<!--     <authentication><key>API_KEY</key><value>XXX</value></authentication> -->
+					<!-- </authentication> -->
+				</configuration>
+				<executions>
+					<execution>
+						<id>generate-asyncapi</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<generatorName>AsyncAPIGenerator</generatorName>
+							<configOptions>
+								<role>provider</role>
+								<!-- payloads are avro: <modelPackage> (${asyncApiModelPackage}) is only needed for json-schema payloads -->
+								<producerApiPackage>${asyncApiProducerApiPackage}</producerApiPackage>
+								<consumerApiPackage>${asyncApiConsumerApiPackage}</consumerApiPackage>
+								<avroCompilerProperties.imports>${asyncapi.avro.imports}</avroCompilerProperties.imports>
+							</configOptions>
+						</configuration>
+					</execution>
+					<execution>
+						<id>generate-asyncapi-client</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<inputSpec>${asyncapi.client.inputSpec}</inputSpec>
+							<generatorName>AsyncAPIGenerator</generatorName>
+							<configOptions>
+								<!-- asyncapi-client.yml is written from this service's point of view (action: receive), so it is generated as provider -->
+								<role>provider</role>
+								<producerApiPackage>${asyncApiClientApiPackage}</producerApiPackage>
+								<consumerApiPackage>${asyncApiClientApiPackage}</consumerApiPackage>
+								<avroCompilerProperties.imports>${asyncapi.client.avro.imports}</avroCompilerProperties.imports>
+							</configOptions>
+						</configuration>
+					</execution>
+				</executions>
+				<dependencies>
+					<dependency>
+						<groupId>io.zenwave360.sdk.plugins</groupId>
+						<artifactId>asyncapi-generator</artifactId>
+						<version>${zenwave.version}</version>
+					</dependency>
+				</dependencies>
+			</plugin>
 		</plugins>
 	</build>
-
-	<profiles>
-		<profile>
-			<id>asyncapi-code-generation</id>
-			<activation>
-				<file>
-					<exists>${asyncapi.inputSpec}</exists>
-				</file>
-			</activation>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>io.zenwave360.sdk</groupId>
-						<artifactId>zenwave-sdk-maven-plugin</artifactId>
-						<version>${zenwave.version}</version>
-						<configuration>
-							<inputSpec>${asyncapi.inputSpec}</inputSpec>
-							<skip>false</skip>
-							<addCompileSourceRoot>true</addCompileSourceRoot>
-							<addTestCompileSourceRoot>true</addTestCompileSourceRoot>
-							<!-- <authentication> -->
-							<!--     <authentication><key>API_KEY</key><value>XXX</value></authentication> -->
-							<!-- </authentication> -->
-						</configuration>
-						<executions>
-							<execution>
-								<id>generate-asyncapi</id>
-								<phase>generate-sources</phase>
-								<goals>
-									<goal>generate</goal>
-								</goals>
-								<configuration>
-									<generatorName>AsyncAPIGenerator</generatorName>
-									<configOptions>
-										<role>provider</role>
-										<!-- <modelPackage> is required for json-schema payloads, drop it when payloads are avro -->
-										<modelPackage>${asyncApiModelPackage}</modelPackage>
-										<producerApiPackage>${asyncApiProducerApiPackage}</producerApiPackage>
-										<consumerApiPackage>${asyncApiConsumerApiPackage}</consumerApiPackage>
-										<!-- for avro payloads: <avroCompilerProperties.imports>${asyncapi.avro.imports}</avroCompilerProperties.imports> -->
-									</configOptions>
-								</configuration>
-							</execution>
-						</executions>
-						<dependencies>
-							<dependency>
-								<groupId>io.zenwave360.sdk.plugins</groupId>
-								<artifactId>asyncapi-generator</artifactId>
-								<version>${zenwave.version}</version>
-							</dependency>
-						</dependencies>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-	</profiles>
 
 </project>

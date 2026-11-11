@@ -1,73 +1,40 @@
-// This is a ZenWave Scripts File (.zw)
+// ZenWave Scripts File (.zw): plugins and configuration for ZenWave SDK code generation.
 //
-// This file defines ZenWave SDK plugins and their configurations for SDK execution and code generation.
+// The models and API contracts are owned by the orders-checkout-api repository and read from
+// its raw GitHub URLs (branch main). Nothing is generated into src/main/resources/public/apis:
+// the OpenAPI/AsyncAPI contracts are produced in that repository from its domain-model.zdl.
 //
-// Usage:
-// - Execute plugins using the Play button in IntelliJ IDEA ZenWave Model Editor
-// - Or Copy the generated command line hovering the play button on each plugin
-// - Or Run commands directly from terminal using the generated command line
-//
-// Plugin: https://plugins.jetbrains.com/plugin/22858-zenwave-domain-model-editor-for-zdl
-//
-// There are global properties that apply to all plugins, and plugin specific properties.
-// Configuration Precedence (highest to lowest):
-// 1. Command line arguments always have the highest precedence
-// 2. Plugin-specific properties (defined in this file)
-// 3. Global properties (defined in this file)
-// 4. Properties from referenced .zdl files
-//
+// Usage: Play button in the ZenWave IDE plugin, or copy the command line shown on hover.
 config {
 
-    // This is a global configuration that applies to all plugins.
-    zdlFile "zenwave-model.zdl"
+    zdlFile "https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/domain-model.zdl"
+    databaseType postgresql
 
-
-    // these should match the values of openapi-generator-maven-plugin
-    // used by the OpenAPIControllersPlugin and SpringWebTestClientPlugin
-    openApiApiPackage "{{basePackage}}.adapters.web"
-    openApiModelPackage "{{basePackage}}.adapters.web.model"
+    layout CleanHexagonalProjectLayout
+    // Package properties (openApi*, entities, core, adapters...) are derived from basePackage and the layout.
+    // The generated AsyncAPI SDK lives outside the hexagon (asyncapi.provider / asyncapi.client), so the
+    // asyncApi* layout values are overridden below. Keep the pom.xml properties openApiApiPackage,
+    // openApiModelPackage, asyncApiModelPackage and asyncApiProducerApiPackage in sync with the layout values.
     openApiModelNameSuffix DTO
 
-
-
-
     plugins {
-        /** Generates an OpenAPI 3.0 specification from the ZDL model. */
-        ZDLToOpenAPIPlugin {
-            idType integer
-            idTypeFormat int64
-            targetFile "src/main/resources/public/apis/openapi.yml"
-        }
-        /** Generates an AsyncAPI 3.0 specification from the ZDL model. */
-        ZDLToAsyncAPIPlugin {
-            asyncapiVersion v3
-            idType integer
-            idTypeFormat int64
-            targetFile "src/main/resources/public/apis/asyncapi.yml"
-            includeCloudEventsHeaders true
-            includeKafkaCommonHeaders true
-        }
         /** Generates a Backend Application from the ZDL model. (Headless Core) */
         BackendApplicationDefaultPlugin {
             useLombok false
             useJSpecify true
             includeEmitEventsImplementation true
+            layout.asyncApiModelPackage "{{basePackage}}.asyncapi.provider.dtos"
+            layout.asyncApiProducerApiPackage "{{basePackage}}.asyncapi.provider"
+            layout.asyncApiConsumerApiPackage "{{basePackage}}.asyncapi.provider"
             // --force // overwite all files
         }
         /** Generates Spring MVC controllers from the OpenAPI specification (Web Adapters). */
         OpenAPIControllersPlugin {
-            openapiFile "src/main/resources/public/apis/openapi.yml"
+            openapiFile "https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/openapi.yml"
         }
-
+        /** Generates API tests from the OpenAPI specification. */
         SpringWebTestClientPlugin {
-            openapiFile "src/main/resources/public/apis/openapi.yml"
-        }
-
-        SpringWebTestClientPlugin {
-            openapiFile "src/main/resources/public/apis/openapi.yml"
-            groupBy businessFlow
-            businessFlowTestName CreateUpdateDeleteCustomerIntegrationTest
-            operationIds createCustomer,updateCustomer,deleteCustomer,getCustomer
+            openapiFile "https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/openapi.yml"
         }
     }
 }
