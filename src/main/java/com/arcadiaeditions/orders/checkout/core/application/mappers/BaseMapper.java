@@ -1,0 +1,36 @@
+package com.arcadiaeditions.orders.checkout.core.application.mappers;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import org.mapstruct.Mapper;
+
+@Mapper
+public interface BaseMapper {
+
+    default Instant asInstant(OffsetDateTime date) {
+        return date != null ? date.toInstant() : null;
+    }
+
+    default OffsetDateTime asOffsetDateTime(Instant date) {
+        return date != null ? OffsetDateTime.ofInstant(date, ZoneOffset.UTC) : null;
+    }
+
+    default LocalDateTime map(OffsetDateTime value) {
+        return value != null ? value.toLocalDateTime() : null;
+    }
+
+    default OffsetDateTime map(LocalDateTime value) {
+        return value != null ? OffsetDateTime.of(value, ZoneOffset.UTC) : null;
+    }
+
+    // avro `string` fields are generated as CharSequence: ISO-8601 timestamps
+    default CharSequence asCharSequence(Instant value) {
+        return value != null ? value.toString() : null;
+    }
+
+    default Instant asInstant(CharSequence value) {
+        return value != null ? Instant.parse(value) : null;
+    }
+}
