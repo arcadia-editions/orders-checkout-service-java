@@ -23,7 +23,7 @@ config {
             useLombok false
             useJSpecify true
             includeEmitEventsImplementation true
-            layout.asyncApiModelPackage "{{basePackage}}.asyncapi.provider.dtos"
+            layout.asyncApiModelPackage "{{basePackage}}.events.avro"
             layout.asyncApiProducerApiPackage "{{basePackage}}.asyncapi.provider"
             layout.asyncApiConsumerApiPackage "{{basePackage}}.asyncapi.provider"
             // --force // overwite all files
