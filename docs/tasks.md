@@ -72,18 +72,19 @@ review: [ ]
       tests: PaymentAuthorizedConsumerServiceTest
       blocked by: T-07
       done: grok grok-4.7
-- [/] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
+- [x] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-342
       test data: data.sql (C-01, C-02)
       tests: OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_201, PlaceOrderFlowCompletedIntegrationTest
       blocked by: T-06, T-08
+      done: claude-code claude-sonnet
 
 ## S2 stockGone
 path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableResult] > StockUnavailable
       > sendStockUnavailableNotification > end stockGone
 review: [ ]
 
-- [ ] T-10 bounded AFK startOrderCheckout unavailable: persist nothing, emit StockUnavailable (orderId, customer, unavailableItems from the result), answer 409 with StockUnavailable body
+- [/] T-10 bounded AFK startOrderCheckout unavailable: persist nothing, emit StockUnavailable (orderId, customer, unavailableItems from the result), answer 409 with StockUnavailable body
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:88-92, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:162-172, ../orders-checkout-api/openapi-overlay.yml
       test data: inventory stub SKU-004 (stub-driven, no row: the order is never persisted)
       tests: OrdersCheckoutServiceTest#startOrderCheckoutStockUnavailableTest, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_409
