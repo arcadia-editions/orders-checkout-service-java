@@ -99,7 +99,7 @@ path: ... > PaymentDeclined | PaymentRetryExhausted | PaymentVoided | PaymentVoi
       > sendOrderCancelledNotification > end orderCancelled
 review: [ ]
 
-- [ ] T-12 bounded AFK cancelOrder: load by orderId, CREATED or CONFIRMED to CANCELLED, cancellationReason = input.reason, cancelledAt, persist, emit OrderCancelled; no-op, no event, on CANCELLED
+- [/] T-12 bounded AFK cancelOrder: load by orderId, CREATED or CONFIRMED to CANCELLED, cancellationReason = input.reason, cancelledAt, persist, emit OrderCancelled; no-op, no event, on CANCELLED
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:300-310, ../orders-checkout-api/domain-model.zdl:117-121, ../orders-checkout-api/domain-model.zdl:141-144, ../orders-checkout-api/domain-model.zdl:195-205
       test data: data.sql (C-03 from CREATED, C-04 from CONFIRMED, C-07 redelivery)
       tests: OrdersCheckoutServiceTest#cancelOrderTest
