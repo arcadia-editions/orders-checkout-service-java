@@ -38,10 +38,11 @@ review: [ ]
       done: claude-code claude-opus
       blocked by: T-01
 
-- [/] T-18 mechanical AFK ArchitectureTest: let the core reach the generated AsyncAPI SDK and Avro models (asyncapi.provider, asyncapi.client, events.avro), outside the hexagon by design (overlay Shape); respectsLayersForHexagonalArchitecture green, no other rule weakened
+- [x] T-18 mechanical AFK ArchitectureTest: let the core reach the generated AsyncAPI SDK and Avro models (asyncapi.provider, asyncapi.client, events.avro), outside the hexagon by design (overlay Shape); respectsLayersForHexagonalArchitecture green, no other rule weakened
       tests: ArchitectureTest
       decided by: person, 2026-11-25 (option 1)
-- [ ] T-19 mechanical AFK S0 review fixes: drop OrdersCheckoutServiceImpl.clock() accessor and the T-02 tests that compare a constant with itself (keep the profile test, move it to a config test); TestClock.NOW instead of the literal in OrderRepositoryIntegrationTest and OrdersCheckoutServiceTest, stale "T-02" comment; one assertEquals style; InventoryClientRestAdapter throws when the body for the outcome is missing; unit test for UuidV7OrderIdGenerator (version 7, variant, time order)
+      done: grok grok-4.7
+- [/] T-19 mechanical AFK S0 review fixes: drop OrdersCheckoutServiceImpl.clock() accessor and the T-02 tests that compare a constant with itself (keep the profile test, move it to a config test); TestClock.NOW instead of the literal in OrderRepositoryIntegrationTest and OrdersCheckoutServiceTest, stale "T-02" comment; one assertEquals style; InventoryClientRestAdapter throws when the body for the outcome is missing; unit test for UuidV7OrderIdGenerator (version 7, variant, time order)
       fixes: .zenwave/handoff/place-order-flow/reports/review-S0.md
       tests: OrdersCheckoutServiceTest, InventoryClientRestAdapterTest, OrderRepositoryIntegrationTest, UuidV7OrderIdGeneratorTest
       blocked by: T-06
@@ -64,7 +65,7 @@ review: [ ]
       tests: OrdersCheckoutServiceTest#confirmOrderTest
       blocked by: T-02, T-03, T-05
       done: claude-code claude-sonnet
-- [ ] T-08 mechanical AFK PaymentAuthorizedConsumerService: map PaymentAuthorized.orderId to ConfirmOrderInput and call confirmOrder
+- [/] T-08 mechanical AFK PaymentAuthorizedConsumerService: map PaymentAuthorized.orderId to ConfirmOrderInput and call confirmOrder
       model: ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:113-115
       test data: data.sql (C-02)
       tests: PaymentAuthorizedConsumerServiceTest
