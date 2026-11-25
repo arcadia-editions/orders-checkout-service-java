@@ -41,9 +41,9 @@ review: [ ]
 - [/] T-18 mechanical AFK ArchitectureTest: let the core reach the generated AsyncAPI SDK and Avro models (asyncapi.provider, asyncapi.client, events.avro), outside the hexagon by design (overlay Shape); respectsLayersForHexagonalArchitecture green, no other rule weakened
       tests: ArchitectureTest
       decided by: person, 2026-11-25 (option 1)
-- [ ] T-19 mechanical AFK S0 review fixes: drop OrdersCheckoutServiceImpl.clock() accessor and the T-02 tests that compare a constant with itself (keep the profile test, move it to a config test); TestClock.NOW instead of the literal in OrderRepositoryIntegrationTest and OrdersCheckoutServiceTest, stale "T-02" comment; one assertEquals style; InventoryClientRestAdapter throws when the body for the outcome is missing
+- [ ] T-19 mechanical AFK S0 review fixes: drop OrdersCheckoutServiceImpl.clock() accessor and the T-02 tests that compare a constant with itself (keep the profile test, move it to a config test); TestClock.NOW instead of the literal in OrderRepositoryIntegrationTest and OrdersCheckoutServiceTest, stale "T-02" comment; one assertEquals style; InventoryClientRestAdapter throws when the body for the outcome is missing; unit test for UuidV7OrderIdGenerator (version 7, variant, time order)
       fixes: .zenwave/handoff/place-order-flow/reports/review-S0.md
-      tests: OrdersCheckoutServiceTest, InventoryClientRestAdapterTest, OrderRepositoryIntegrationTest
+      tests: OrdersCheckoutServiceTest, InventoryClientRestAdapterTest, OrderRepositoryIntegrationTest, UuidV7OrderIdGeneratorTest
       blocked by: T-06
 
 ## S1 completed (tracer bullet)
@@ -52,12 +52,13 @@ path: StartOrderCheckout > startOrderCheckout > reserveStock[StockReservedResult
       > OrderConfirmed > ... > end completed
 review: [ ]
 
-- [/] T-06 bounded AFK startOrderCheckout reserved: new orderId, reserveStock, totalAmount = sum(quantity * unitPrice), CREATED + createdAt, persist, emit only OrderCreated
+- [x] T-06 bounded AFK startOrderCheckout reserved: new orderId, reserveStock, totalAmount = sum(quantity * unitPrice), CREATED + createdAt, persist, emit only OrderCreated
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:79-93, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:150-160
       test data: data.sql (C-02 for the shape of a CREATED order)
       tests: OrdersCheckoutServiceTest#startOrderCheckoutTest, OrdersCheckoutApiControllerTest#startOrderCheckoutTest
       blocked by: T-02, T-03, T-04, T-05
-- [ ] T-07 bounded AFK confirmOrder confirmed: load by orderId, confirmStockReservation, CONFIRMED + confirmedAt, persist, emit OrderConfirmed with items and shippingAddress; no-op on CONFIRMED (redelivery)
+      done: claude-code claude-sonnet
+- [/] T-07 bounded AFK confirmOrder confirmed: load by orderId, confirmStockReservation, CONFIRMED + confirmedAt, persist, emit OrderConfirmed with items and shippingAddress; no-op on CONFIRMED (redelivery)
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:174-193
       test data: data.sql (C-02 confirmed, C-01 redelivery)
       tests: OrdersCheckoutServiceTest#confirmOrderTest
