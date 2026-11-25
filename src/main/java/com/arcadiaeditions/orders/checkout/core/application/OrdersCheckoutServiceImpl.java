@@ -92,14 +92,12 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
             return existing;
         }
         if (existing.getStatus() == OrderStatus.CANCELLED) {
-            // OrderConfirmationRejected ORDER_CANCELLED: task T-15
-            throw new UnsupportedOperationException("ORDER_CANCELLED branch of confirmOrder: task T-15");
+            return rejectConfirmation(existing, "ORDER_CANCELLED");
         }
         OrderTransitions.ensureCanConfirmOrder(existing);
         var confirmation = inventoryClient.confirmStockReservation(existing.getOrderId());
         if (!(confirmation instanceof StockReservationConfirmedResult)) {
-            // OrderConfirmationRejected STOCK_NOT_HELD: task T-15
-            throw new UnsupportedOperationException("STOCK_NOT_HELD branch of confirmOrder: task T-15");
+            return rejectConfirmation(existing, "STOCK_NOT_HELD");
         }
         existing.setStatus(OrderStatus.CONFIRMED);
         existing.setConfirmedAt(Instant.now(clock));
@@ -107,6 +105,13 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
         // emit events
         var orderConfirmed = eventsMapper.asOrderConfirmed(order);
         eventsProducer.onOrderConfirmed(orderConfirmed);
+        return order;
+    }
+
+    private Order rejectConfirmation(Order order, String reason) {
+        // no state change: only the event asking payments to void the late authorization
+        var rejected = eventsMapper.asOrderConfirmationRejected(order, reason, Instant.now(clock));
+        eventsProducer.onOrderConfirmationRejected(rejected);
         return order;
     }
 

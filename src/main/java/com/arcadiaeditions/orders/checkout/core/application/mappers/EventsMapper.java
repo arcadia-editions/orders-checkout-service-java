@@ -16,6 +16,11 @@ public interface EventsMapper {
 
     com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmed asOrderConfirmed(Order order);
 
+    @Mapping(target = "reason", source = "reason")
+    @Mapping(target = "rejectedAt", source = "rejectedAt")
+    com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmationRejected asOrderConfirmationRejected(
+            Order order, String reason, java.time.Instant rejectedAt);
+
     @Mapping(target = "reason", source = "cancellationReason")
     com.arcadiaeditions.orders.checkout.events.avro.OrderCancelled asOrderCancelled(Order order);
 

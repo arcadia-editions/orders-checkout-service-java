@@ -97,6 +97,37 @@ class OrdersCheckoutServiceTest {
     }
 
     @Test
+    void confirmOrderRejectedTest() {
+        var producer = context.getEventsProducerInMemoryContext().ordersCheckoutEventsProducer();
+
+        // C-05: ORD-005 CREATED, inventory answers NOT_HELD
+        var notHeld = ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-005"));
+        assertEquals(OrderStatus.CREATED, notHeld.getStatus());
+        assertEquals(OrderStatus.CREATED, orderRepository.findByOrderId("ORD-005").orElseThrow().getStatus());
+        assertEquals(0, producer.getOnOrderConfirmedCapturedMessages().size());
+        assertEquals(1, producer.getOnOrderConfirmationRejectedCapturedMessages().size());
+        var e1 = (com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmationRejected)
+                producer.getOnOrderConfirmationRejectedCapturedMessages().get(0).getPayload();
+        assertEquals("ORD-005", e1.getOrderId().toString());
+        assertEquals("CUST-005", e1.getCustomerId().toString());
+        assertEquals("STOCK_NOT_HELD", e1.getReason().toString());
+        assertEquals(TestClock.NOW.toString(), e1.getRejectedAt().toString());
+
+        // C-06: ORD-006 CANCELLED; inventory must not be called (it would answer NOT_HELD)
+        context.inventoryClient().notHeldOrderIds().add("ORD-006");
+        var cancelled = ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-006"));
+        assertEquals(OrderStatus.CANCELLED, cancelled.getStatus());
+        assertEquals(OrderStatus.CANCELLED, orderRepository.findByOrderId("ORD-006").orElseThrow().getStatus());
+        assertEquals(0, producer.getOnOrderConfirmedCapturedMessages().size());
+        assertEquals(2, producer.getOnOrderConfirmationRejectedCapturedMessages().size());
+        var e2 = (com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmationRejected)
+                producer.getOnOrderConfirmationRejectedCapturedMessages().get(1).getPayload();
+        assertEquals("ORD-006", e2.getOrderId().toString());
+        assertEquals("ORDER_CANCELLED", e2.getReason().toString());
+        assertEquals(TestClock.NOW.toString(), e2.getRejectedAt().toString());
+    }
+
+    @Test
     void confirmOrderRedeliveryOnConfirmedIsNoOp() {
         // inventory would answer NOT_HELD if it were called: redelivery must not call it
         context.inventoryClient().notHeldOrderIds().add("ORD-001");
