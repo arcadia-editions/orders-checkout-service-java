@@ -33,6 +33,24 @@ class OrderRepositoryIntegrationTest extends BaseRepositoryIntegrationTest {
     }
 
     @Test
+    void findByOrderIdTest() {
+        // data.sql C-02: ORD-002 CREATED
+        var created = orderRepository.findByOrderId("ORD-002").orElseThrow();
+        Assertions.assertEquals("ORD-002", created.getOrderId());
+        Assertions.assertEquals(OrderStatus.CREATED, created.getStatus());
+        Assertions.assertEquals("CUST-002", created.getCustomerId());
+
+        // data.sql C-06: ORD-006 CANCELLED RESERVATION_EXPIRED
+        var cancelled = orderRepository.findByOrderId("ORD-006").orElseThrow();
+        Assertions.assertEquals("ORD-006", cancelled.getOrderId());
+        Assertions.assertEquals(OrderStatus.CANCELLED, cancelled.getStatus());
+        Assertions.assertEquals("CUST-006", cancelled.getCustomerId());
+        Assertions.assertEquals("RESERVATION_EXPIRED", cancelled.getCancellationReason());
+
+        Assertions.assertTrue(orderRepository.findByOrderId("ORD-UNKNOWN").isEmpty());
+    }
+
+    @Test
     void saveTest() {
         Order order = new Order();
         order.setOrderId("");
