@@ -32,9 +32,10 @@ review: [ ]
 - [x] T-04 bounded HITL Decide how orderId is generated (format, who generates it) and record it as an ADR; ZDL and ZFL do not say
       model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:92-111
       done: person (HITL), docs/adr/0001-order-id.md
-- [/] T-05 advanced AFK Outbound port InventoryClient (reserveStock, confirmStockReservation) with its REST adapter on catalog-inventory /inventory/reservations/{reserve,confirm}, and an in-memory stub for tests (SKU-004 unavailable, NOT_HELD by orderId)
+- [x] T-05 advanced AFK Outbound port InventoryClient (reserveStock, confirmStockReservation) with its REST adapter on catalog-inventory /inventory/reservations/{reserve,confirm}, and an in-memory stub for tests (SKU-004 unavailable, NOT_HELD by orderId)
       model: ../orders-checkout-api/domain-model.zdl:129, ../orders-checkout-api/domain-model.zdl:138, ../catalog-inventory-api/domain-model.zdl:115-145, ../catalog-inventory-api/domain-model.zdl:169-171, ../catalog-inventory-api/domain-model.zdl:192-194, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:101-105, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:171-176
       tests: InventoryClientStubTest
+      done: claude-code claude-opus
       blocked by: T-01
 
 ## S1 completed (tracer bullet)
@@ -43,7 +44,7 @@ path: StartOrderCheckout > startOrderCheckout > reserveStock[StockReservedResult
       > OrderConfirmed > ... > end completed
 review: [ ]
 
-- [ ] T-06 bounded AFK startOrderCheckout reserved: new orderId, reserveStock, totalAmount = sum(quantity * unitPrice), CREATED + createdAt, persist, emit only OrderCreated
+- [/] T-06 bounded AFK startOrderCheckout reserved: new orderId, reserveStock, totalAmount = sum(quantity * unitPrice), CREATED + createdAt, persist, emit only OrderCreated
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:79-93, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:150-160
       test data: data.sql (C-02 for the shape of a CREATED order)
       tests: OrdersCheckoutServiceTest#startOrderCheckoutTest, OrdersCheckoutApiControllerTest#startOrderCheckoutTest
