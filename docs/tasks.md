@@ -58,11 +58,12 @@ review: [ ]
       tests: OrdersCheckoutServiceTest#startOrderCheckoutTest, OrdersCheckoutApiControllerTest#startOrderCheckoutTest
       blocked by: T-02, T-03, T-04, T-05
       done: claude-code claude-sonnet
-- [/] T-07 bounded AFK confirmOrder confirmed: load by orderId, confirmStockReservation, CONFIRMED + confirmedAt, persist, emit OrderConfirmed with items and shippingAddress; no-op on CONFIRMED (redelivery)
+- [x] T-07 bounded AFK confirmOrder confirmed: load by orderId, confirmStockReservation, CONFIRMED + confirmedAt, persist, emit OrderConfirmed with items and shippingAddress; no-op on CONFIRMED (redelivery)
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:174-193
       test data: data.sql (C-02 confirmed, C-01 redelivery)
       tests: OrdersCheckoutServiceTest#confirmOrderTest
       blocked by: T-02, T-03, T-05
+      done: claude-code claude-sonnet
 - [ ] T-08 mechanical AFK PaymentAuthorizedConsumerService: map PaymentAuthorized.orderId to ConfirmOrderInput and call confirmOrder
       model: ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:113-115
       test data: data.sql (C-02)
