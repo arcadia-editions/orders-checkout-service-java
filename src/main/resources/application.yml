@@ -1,3 +1,6 @@
+server:
+  port: ${SERVER_PORT:8101}
+
 logging:
   level:
     com.arcadiaeditions.orders.checkout: DEBUG
@@ -46,3 +49,11 @@ spring:
       bindings:
         on-customer-event-out:
           destination: customer.events
+
+# synchronous calls to other services: see docs/backlog/http-clients.md
+arcadia:
+  clients:
+    catalog-inventory:
+      base-url: ${CATALOG_INVENTORY_URL:http://localhost:8102/api}
+      username: ${CATALOG_INVENTORY_USERNAME:admin}
+      password: ${CATALOG_INVENTORY_PASSWORD:password}
