@@ -2,6 +2,7 @@ package com.arcadiaeditions.orders.checkout.adapters.web;
 
 import com.arcadiaeditions.orders.checkout.adapters.web.dtos.*;
 import com.arcadiaeditions.orders.checkout.config.ServicesInMemoryConfig;
+import com.arcadiaeditions.orders.checkout.config.TestClock;
 import java.math.*;
 import java.time.*;
 import java.util.*;
@@ -54,8 +55,7 @@ public class OrdersCheckoutApiControllerTest {
         Assertions.assertEquals("ORD-100", body.getOrderId());
         Assertions.assertEquals(OrderStatusDTO.CREATED, body.getStatus());
         Assertions.assertEquals(0, new BigDecimal("39.98").compareTo(body.getTotalAmount()));
-        Assertions.assertEquals(
-                OffsetDateTime.ofInstant(Instant.parse("2026-10-14T10:00:00Z"), ZoneOffset.UTC), body.getCreatedAt());
+        Assertions.assertEquals(OffsetDateTime.ofInstant(TestClock.NOW, ZoneOffset.UTC), body.getCreatedAt());
     }
 
     @Test

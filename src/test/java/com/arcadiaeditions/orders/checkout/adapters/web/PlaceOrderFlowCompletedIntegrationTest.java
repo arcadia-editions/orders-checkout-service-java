@@ -1,6 +1,7 @@
 package com.arcadiaeditions.orders.checkout.adapters.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 
@@ -71,6 +72,11 @@ class PlaceOrderFlowCompletedIntegrationTest extends BaseWebTestClientTest {
         paymentAuthorizedConsumer.onPaymentAuthorizedEventV1(payment, null);
 
         assertEquals(1, confirmedFor(orderId).size());
+        long createdVersion = ((OrderCreated) createdFor(orderId).get(0).getPayload()).getVersion();
+        long confirmedVersion = ((OrderConfirmed) confirmedFor(orderId).get(0).getPayload()).getVersion();
+        assertTrue(
+                confirmedVersion > createdVersion,
+                "OrderConfirmed.version " + confirmedVersion + " must be after OrderCreated.version " + createdVersion);
 
         webTestClient
                 .method(GET)
