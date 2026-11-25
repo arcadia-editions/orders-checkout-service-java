@@ -4,6 +4,7 @@ import com.arcadiaeditions.orders.checkout.asyncapi.provider.*;
 import com.arcadiaeditions.orders.checkout.core.application.*;
 import com.arcadiaeditions.orders.checkout.core.domain.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.*;
+import java.time.Clock;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,8 +19,10 @@ public class ServicesInMemoryConfig extends RepositoriesInMemoryConfig {
 
     protected final EventsProducerInMemoryContext eventsProducerInMemoryContext = new EventsProducerInMemoryContext();
 
+    protected final Clock clock = TestClock.FIXED;
+
     protected final OrdersCheckoutServiceImpl ordersCheckoutService = new OrdersCheckoutServiceImpl(
-            orderRepository(), eventsProducerInMemoryContext.ordersCheckoutEventsProducer());
+            orderRepository(), eventsProducerInMemoryContext.ordersCheckoutEventsProducer(), clock);
 
     @Bean
     public <T extends OrdersCheckoutService> T ordersCheckoutService() {

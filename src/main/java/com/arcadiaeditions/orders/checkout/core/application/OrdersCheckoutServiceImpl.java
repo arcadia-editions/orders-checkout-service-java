@@ -31,13 +31,21 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
 
     private final EventsMapper eventsMapper = EventsMapper.INSTANCE;
     private final OrdersCheckoutEventsProducer eventsProducer;
+    private final Clock clock;
 
     /**
      * Constructor.
      */
-    public OrdersCheckoutServiceImpl(OrderRepository orderRepository, OrdersCheckoutEventsProducer eventsProducer) {
+    public OrdersCheckoutServiceImpl(
+            OrderRepository orderRepository, OrdersCheckoutEventsProducer eventsProducer, Clock clock) {
         this.orderRepository = orderRepository;
         this.eventsProducer = eventsProducer;
+        this.clock = clock;
+    }
+
+    /** Clock used for createdAt, confirmedAt, cancelledAt and event timestamps such as rejectedAt. */
+    Clock clock() {
+        return clock;
     }
 
     public Order startOrderCheckout(StartOrderCheckoutInput input) {
