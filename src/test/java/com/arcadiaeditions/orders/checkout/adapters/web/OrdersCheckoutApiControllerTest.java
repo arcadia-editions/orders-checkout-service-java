@@ -36,8 +36,9 @@ public class OrdersCheckoutApiControllerTest {
 
     @Test
     public void getOrderTest() {
-        Long id = null;
+        Long id = 1L; // fixtures: data/jpa/Order/1.json, C-01 ORD-001
         var response = controller.getOrder(id);
         Assertions.assertEquals(200, response.getStatusCode().value());
+        Assertions.assertEquals("ORD-001", response.getBody().getOrderId());
     }
 }

@@ -62,34 +62,42 @@ class OrderRepositoryIntegrationTest extends BaseRepositoryIntegrationTest {
     @Test
     void updateTest() {
         var id = 1L;
+        var items = List.of(new OrderItem());
+        var address = new ShippingAddress();
+        // Approved test now (overlay). A fixed Clock is T-02; this test only needs one instant.
+        var now = Instant.parse("2026-10-14T10:00:00Z");
         var order = orderRepository.findById(id).orElseThrow();
         order.setOrderId("");
         order.setStatus(OrderStatus.values()[0]);
         order.setCustomerId("");
         order.setCustomerEmail("");
         order.setPaymentMethodId("");
-        order.setItems(List.of(new OrderItem()));
-        order.setShippingAddress(new ShippingAddress());
+        order.setItems(items);
+        order.setShippingAddress(address);
         order.setTotalAmount(BigDecimal.valueOf(0));
         order.setCurrency("");
-        order.setCreatedAt(Instant.now());
-        order.setConfirmedAt(Instant.now());
-        order.setCancelledAt(Instant.now());
+        order.setCreatedAt(now);
+        order.setConfirmedAt(now);
+        order.setCancelledAt(now);
         order.setCancellationReason("");
 
         order = orderRepository.save(order);
+        entityManager.flush();
+        entityManager.clear();
+        order = orderRepository.findById(id).orElseThrow();
         Assertions.assertEquals("", order.getOrderId());
         Assertions.assertEquals(OrderStatus.values()[0], order.getStatus());
         Assertions.assertEquals("", order.getCustomerId());
         Assertions.assertEquals("", order.getCustomerEmail());
         Assertions.assertEquals("", order.getPaymentMethodId());
-        Assertions.assertEquals(List.of(new OrderItem()), order.getItems());
-        Assertions.assertEquals(new ShippingAddress(), order.getShippingAddress());
-        Assertions.assertEquals(BigDecimal.valueOf(0), order.getTotalAmount());
+        // OrderItem has no equals; JSON reload is a new instance. Assert the collection, not identity.
+        Assertions.assertEquals(items.size(), order.getItems().size());
+        Assertions.assertNotNull(order.getShippingAddress());
+        Assertions.assertEquals(0, BigDecimal.ZERO.compareTo(order.getTotalAmount()));
         Assertions.assertEquals("", order.getCurrency());
-        Assertions.assertEquals(Instant.now(), order.getCreatedAt());
-        Assertions.assertEquals(Instant.now(), order.getConfirmedAt());
-        Assertions.assertEquals(Instant.now(), order.getCancelledAt());
+        Assertions.assertEquals(now, order.getCreatedAt());
+        Assertions.assertEquals(now, order.getConfirmedAt());
+        Assertions.assertEquals(now, order.getCancelledAt());
         Assertions.assertEquals("", order.getCancellationReason());
     }
 
