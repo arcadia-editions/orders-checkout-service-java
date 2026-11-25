@@ -38,6 +38,14 @@ review: [ ]
       done: claude-code claude-opus
       blocked by: T-01
 
+- [ ] T-18 mechanical AFK ArchitectureTest: let the core reach the generated AsyncAPI SDK and Avro models (asyncapi.provider, asyncapi.client, events.avro), outside the hexagon by design (overlay Shape); respectsLayersForHexagonalArchitecture green, no other rule weakened
+      tests: ArchitectureTest
+      decided by: person, 2026-11-25 (option 1)
+- [ ] T-19 mechanical AFK S0 review fixes: drop OrdersCheckoutServiceImpl.clock() accessor and the T-02 tests that compare a constant with itself (keep the profile test, move it to a config test); TestClock.NOW instead of the literal in OrderRepositoryIntegrationTest and OrdersCheckoutServiceTest, stale "T-02" comment; one assertEquals style; InventoryClientRestAdapter throws when the body for the outcome is missing
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S0.md
+      tests: OrdersCheckoutServiceTest, InventoryClientRestAdapterTest, OrderRepositoryIntegrationTest
+      blocked by: T-06
+
 ## S1 completed (tracer bullet)
 path: StartOrderCheckout > startOrderCheckout > reserveStock[StockReservedResult] > OrderCreated
       > authorizePayment[authorized] > PaymentAuthorized > confirmOrder[confirmed] > confirmStockReservation
