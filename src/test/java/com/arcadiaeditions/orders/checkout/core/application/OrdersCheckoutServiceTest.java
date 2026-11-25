@@ -47,8 +47,11 @@ class OrdersCheckoutServiceTest {
 
     @Test
     void getOrderTest() {
-        Long id = null;
+        Long id = 1L; // fixtures: data/jpa/Order/1.json, C-01 ORD-001
         var order = ordersCheckoutService.getOrder(id);
         assertTrue(order.isPresent());
+        org.junit.jupiter.api.Assertions.assertEquals("ORD-001", order.get().getOrderId());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                OrderStatus.CONFIRMED, order.get().getStatus());
     }
 }
