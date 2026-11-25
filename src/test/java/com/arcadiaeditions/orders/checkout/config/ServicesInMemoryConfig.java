@@ -25,8 +25,14 @@ public class ServicesInMemoryConfig extends RepositoriesInMemoryConfig {
 
     protected final InventoryClientStub inventoryClient = new InventoryClientStub(clock);
 
+    protected final OrderIdGeneratorStub orderIdGenerator = new OrderIdGeneratorStub();
+
     protected final OrdersCheckoutServiceImpl ordersCheckoutService = new OrdersCheckoutServiceImpl(
-            orderRepository(), eventsProducerInMemoryContext.ordersCheckoutEventsProducer(), clock);
+            orderRepository(),
+            eventsProducerInMemoryContext.ordersCheckoutEventsProducer(),
+            clock,
+            inventoryClient,
+            orderIdGenerator);
 
     @Bean
     public <T extends OrdersCheckoutService> T ordersCheckoutService() {

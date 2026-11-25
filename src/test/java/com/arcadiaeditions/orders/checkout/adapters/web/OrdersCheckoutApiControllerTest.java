@@ -29,9 +29,33 @@ public class OrdersCheckoutApiControllerTest {
 
     @Test
     public void startOrderCheckoutTest() {
-        StartOrderCheckoutInputDTO reqBody = null;
+        var item = new OrderItemInputDTO();
+        item.setSku("SKU-002");
+        item.setQuantity(2);
+        item.setUnitPrice(new BigDecimal("19.99"));
+        var address = new ShippingAddressInputDTO();
+        address.setName("Ada Customer");
+        address.setLine1("1 Main St");
+        address.setCity("Madrid");
+        address.setPostalCode("28001");
+        address.setCountry("ES");
+        var reqBody = new StartOrderCheckoutInputDTO();
+        reqBody.setCustomerId("CUST-100");
+        reqBody.setCustomerEmail("customer100@example.com");
+        reqBody.setPaymentMethodId("PM-100");
+        reqBody.setCurrency("EUR");
+        reqBody.setItems(List.of(item));
+        reqBody.setShippingAddress(address);
+
         var response = controller.startOrderCheckout(reqBody);
+
         Assertions.assertEquals(201, response.getStatusCode().value());
+        var body = response.getBody();
+        Assertions.assertEquals("ORD-100", body.getOrderId());
+        Assertions.assertEquals(OrderStatusDTO.CREATED, body.getStatus());
+        Assertions.assertEquals(0, new BigDecimal("39.98").compareTo(body.getTotalAmount()));
+        Assertions.assertEquals(
+                OffsetDateTime.ofInstant(Instant.parse("2026-10-14T10:00:00Z"), ZoneOffset.UTC), body.getCreatedAt());
     }
 
     @Test
