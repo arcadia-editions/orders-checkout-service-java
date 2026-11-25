@@ -122,11 +122,12 @@ path: ... > PaymentAuthorized > confirmOrder[stock-not-held | order-cancelled] >
       > voidPayment > PaymentVoided > releaseStock > StockReleased > cancelOrder > end orderCancelled
 review: [ ]
 
-- [/] T-15 bounded AFK confirmOrder rejected: on CANCELLED emit OrderConfirmationRejected ORDER_CANCELLED; on NOT_HELD emit it with STOCK_NOT_HELD; no state change (EventsMapper asOrderConfirmationRejected with reason and rejectedAt)
+- [x] T-15 bounded AFK confirmOrder rejected: on CANCELLED emit OrderConfirmationRejected ORDER_CANCELLED; on NOT_HELD emit it with STOCK_NOT_HELD; no state change (EventsMapper asOrderConfirmationRejected with reason and rejectedAt)
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:147-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:206-214, ../catalog-inventory-api/domain-model.zdl:115-125
       test data: data.sql (C-05 stock-not-held, C-06 order-cancelled)
       tests: OrdersCheckoutServiceTest#confirmOrderRejectedTest
       blocked by: T-07
+      done: claude-code claude-sonnet
 - [ ] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164
       test data: data.sql (C-05, C-06)
