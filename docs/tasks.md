@@ -75,7 +75,7 @@ review: [ ]
 - [/] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-342
       test data: data.sql (C-01, C-02)
-      tests: OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_201, PlaceOrderFlowCompletedTest
+      tests: OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_201, PlaceOrderFlowCompletedIntegrationTest
       blocked by: T-06, T-08
 
 ## S2 stockGone
@@ -90,7 +90,7 @@ review: [ ]
       blocked by: T-06
 - [ ] T-11 bounded AFK Flow test stockGone (orders side): POST start-checkout with SKU-004 answers 409, no Order row, StockUnavailable emitted
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-343
-      tests: PlaceOrderFlowStockGoneTest
+      tests: PlaceOrderFlowStockGoneIntegrationTest
       blocked by: T-10
 
 ## S3 orderCancelled
@@ -113,7 +113,7 @@ review: [ ]
 - [ ] T-14 bounded AFK Flow test orderCancelled (orders side), one case per cause: PAYMENT_DECLINED, PAYMENT_RETRY_EXHAUSTED, RESERVATION_EXPIRED from CREATED; PAYMENT_VOIDED, PAYMENT_VOID_FAILED from CONFIRMED; GET shows CANCELLED with the reason
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:262-266, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-344
       test data: data.sql (C-03, C-04, C-06..C-10)
-      tests: PlaceOrderFlowCancelledTest
+      tests: PlaceOrderFlowCancelledIntegrationTest
       blocked by: T-13
 
 ## S4 late authorization rejected
@@ -129,7 +129,7 @@ review: [ ]
 - [ ] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164
       test data: data.sql (C-05, C-06)
-      tests: PlaceOrderFlowLateAuthorizationTest
+      tests: PlaceOrderFlowLateAuthorizationIntegrationTest
       blocked by: T-08, T-15
 
 ## S5 polish
