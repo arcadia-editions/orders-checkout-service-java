@@ -15,7 +15,7 @@ service-all 0.2.0 (consumed Avro); ZFL at arcadia-editions-architecture tag base
 -->
 
 ## S0 Baseline
-review: [ ]
+review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/review-S0b.md
 
 - [x] T-01 mechanical AFK Generated tests that should pass do: getOrderTest with a fixture id, updateTest without Instant.now()/OrderItem equality, API tests with a datasource
       test data: data/jpa/Order/1.json, data.sql (C-01, id 1)
@@ -72,7 +72,7 @@ review: [ ]
       tests: PaymentAuthorizedConsumerServiceTest
       blocked by: T-07
       done: grok grok-4.7
-- [ ] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
+- [/] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-342
       test data: data.sql (C-01, C-02)
       tests: OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_201, PlaceOrderFlowCompletedTest
@@ -99,12 +99,13 @@ path: ... > PaymentDeclined | PaymentRetryExhausted | PaymentVoided | PaymentVoi
       > sendOrderCancelledNotification > end orderCancelled
 review: [ ]
 
-- [/] T-12 bounded AFK cancelOrder: load by orderId, CREATED or CONFIRMED to CANCELLED, cancellationReason = input.reason, cancelledAt, persist, emit OrderCancelled; no-op, no event, on CANCELLED
+- [x] T-12 bounded AFK cancelOrder: load by orderId, CREATED or CONFIRMED to CANCELLED, cancellationReason = input.reason, cancelledAt, persist, emit OrderCancelled; no-op, no event, on CANCELLED
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:300-310, ../orders-checkout-api/domain-model.zdl:117-121, ../orders-checkout-api/domain-model.zdl:141-144, ../orders-checkout-api/domain-model.zdl:195-205
       test data: data.sql (C-03 from CREATED, C-04 from CONFIRMED, C-07 redelivery)
       tests: OrdersCheckoutServiceTest#cancelOrderTest
       blocked by: T-02, T-03
-- [ ] T-13 mechanical AFK StockReleasedConsumerService: map StockReleased (orderId, reason name) to CancelOrderInput and call cancelOrder
+      done: claude-code claude-sonnet
+- [/] T-13 mechanical AFK StockReleasedConsumerService: map StockReleased (orderId, reason name) to CancelOrderInput and call cancelOrder
       model: ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/domain-model.zdl:117-121, ../catalog-inventory-api/domain-model.zdl:74-80
       test data: data.sql (C-03)
       tests: StockReleasedConsumerServiceTest
