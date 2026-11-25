@@ -121,7 +121,51 @@ class OrdersCheckoutServiceTest {
     }
 
     @Test
-    void cancelOrderTest() { // TODO: implement this test
+    void cancelOrderTest() { // C-03: ORD-003 CREATED -> CANCELLED
+        var order = ordersCheckoutService.cancelOrder(
+                new CancelOrderInput().setOrderId("ORD-003").setReason("PAYMENT_DECLINED"));
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals("PAYMENT_DECLINED", order.getCancellationReason());
+        assertEquals(TestClock.NOW, order.getCancelledAt());
+        assertEquals(order, orderRepository.findByOrderId("ORD-003").orElseThrow());
+        assertCancelledEvent("ORD-003", "PAYMENT_DECLINED");
+    }
+
+    @Test
+    void cancelOrderFromConfirmedTest() { // C-04: ORD-004 CONFIRMED -> CANCELLED
+        var order = ordersCheckoutService.cancelOrder(
+                new CancelOrderInput().setOrderId("ORD-004").setReason("PAYMENT_VOIDED"));
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals("PAYMENT_VOIDED", order.getCancellationReason());
+        assertEquals(TestClock.NOW, order.getCancelledAt());
+        assertCancelledEvent("ORD-004", "PAYMENT_VOIDED");
+    }
+
+    @Test
+    void cancelOrderRedeliveryOnCancelledIsNoOp() { // C-07: ORD-007 already CANCELLED
+        var before = orderRepository.findByOrderId("ORD-007").orElseThrow();
+        var cancelledAt = before.getCancelledAt();
+
+        var order = ordersCheckoutService.cancelOrder(
+                new CancelOrderInput().setOrderId("ORD-007").setReason("RESERVATION_EXPIRED"));
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals("PAYMENT_DECLINED", order.getCancellationReason());
+        assertEquals(cancelledAt, order.getCancelledAt());
+        var producer = context.getEventsProducerInMemoryContext().ordersCheckoutEventsProducer();
+        assertEquals(0, producer.getOnOrderCancelledCapturedMessages().size());
+    }
+
+    private void assertCancelledEvent(String orderId, String reason) {
+        var producer = context.getEventsProducerInMemoryContext().ordersCheckoutEventsProducer();
+        assertEquals(1, producer.getOnOrderCancelledCapturedMessages().size());
+        var event = (com.arcadiaeditions.orders.checkout.events.avro.OrderCancelled)
+                producer.getOnOrderCancelledCapturedMessages().get(0).getPayload();
+        assertEquals(orderId, event.getOrderId().toString());
+        assertEquals(reason, event.getReason().toString());
+        assertEquals(TestClock.NOW.toString(), event.getCancelledAt().toString());
     }
 
     @Test

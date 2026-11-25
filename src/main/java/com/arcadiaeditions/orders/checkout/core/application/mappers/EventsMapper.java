@@ -16,6 +16,7 @@ public interface EventsMapper {
 
     com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmed asOrderConfirmed(Order order);
 
+    @Mapping(target = "reason", source = "cancellationReason")
     com.arcadiaeditions.orders.checkout.events.avro.OrderCancelled asOrderCancelled(Order order);
 
     com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable asStockUnavailable(Order order);
