@@ -1,0 +1,121 @@
+# PlaceOrderFlow: tasks
+
+flow: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl
+baseline:
+branch: afk/place-order-flow
+
+<!--
+Scope: the OrdersCheckout bounded context (this repository) only. The steps of the other contexts (inventory,
+payments, fulfillment, notifications) are boards of their own repositories; here they are stubs or Kafka messages.
+Model paths: ZFL = ../arcadia-editions-architecture/business-flows/place-order-flow.zfl,
+ZDL = ../orders-checkout-api/domain-model.zdl, inventory ZDL = ../catalog-inventory-api/domain-model.zdl.
+Test data chains C-01..C-10: header of src/test/resources/data.sql.
+-->
+
+## S0 Baseline
+review: [ ]
+
+- [ ] T-01 mechanical AFK Generated tests that should pass do: getOrderTest with a fixture id, updateTest without Instant.now()/OrderItem equality, API tests with a datasource
+      test data: data/jpa/Order/1.json, data.sql (C-01, id 1)
+      tests: OrdersCheckoutServiceTest, OrderRepositoryIntegrationTest, OrdersCheckoutApiControllerTest#getOrderTest, OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_400
+- [ ] T-02 mechanical AFK Inject a java.time.Clock (system clock in main, fixed 2026-10-14T10:00:00Z in tests) for every timestamp the service sets
+      tests: OrdersCheckoutServiceTest
+- [ ] T-03 mechanical AFK OrderRepository.findByOrderId (JPA and in-memory twin): commands correlate by orderId
+      model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:113-121
+      test data: data.sql (C-02, C-06)
+      tests: OrderRepositoryIntegrationTest
+- [ ] T-04 bounded HITL Decide how orderId is generated (format, who generates it) and record it as an ADR; ZDL and ZFL do not say
+      model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:92-111
+- [ ] T-05 advanced AFK Outbound port InventoryClient (reserveStock, confirmStockReservation) with its REST adapter on catalog-inventory /inventory/reservations/{reserve,confirm}, and an in-memory stub for tests (SKU-004 unavailable, NOT_HELD by orderId)
+      model: ../orders-checkout-api/domain-model.zdl:129, ../orders-checkout-api/domain-model.zdl:138, ../catalog-inventory-api/domain-model.zdl:115-145, ../catalog-inventory-api/domain-model.zdl:169-171, ../catalog-inventory-api/domain-model.zdl:192-194, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:101-105, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:171-176
+      tests: InventoryClientStubTest
+      blocked by: T-01
+
+## S1 completed (tracer bullet)
+path: StartOrderCheckout > startOrderCheckout > reserveStock[StockReservedResult] > OrderCreated
+      > authorizePayment[authorized] > PaymentAuthorized > confirmOrder[confirmed] > confirmStockReservation
+      > OrderConfirmed > ... > end completed
+review: [ ]
+
+- [ ] T-06 bounded AFK startOrderCheckout reserved: new orderId, reserveStock, totalAmount = sum(quantity * unitPrice), CREATED + createdAt, persist, emit only OrderCreated
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:79-93, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:150-160
+      test data: data.sql (C-02 for the shape of a CREATED order)
+      tests: OrdersCheckoutServiceTest#startOrderCheckoutTest, OrdersCheckoutApiControllerTest#startOrderCheckoutTest
+      blocked by: T-02, T-03, T-04, T-05
+- [ ] T-07 bounded AFK confirmOrder confirmed: load by orderId, confirmStockReservation, CONFIRMED + confirmedAt, persist, emit OrderConfirmed with items and shippingAddress; no-op on CONFIRMED (redelivery)
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:174-193
+      test data: data.sql (C-02 confirmed, C-01 redelivery)
+      tests: OrdersCheckoutServiceTest#confirmOrderTest
+      blocked by: T-02, T-03, T-05
+- [ ] T-08 mechanical AFK PaymentAuthorizedConsumerService: map PaymentAuthorized.orderId to ConfirmOrderInput and call confirmOrder
+      model: ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:113-115
+      test data: data.sql (C-02)
+      tests: PaymentAuthorizedConsumerServiceTest
+      blocked by: T-07
+- [ ] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-342
+      test data: data.sql (C-01, C-02)
+      tests: OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_201, PlaceOrderFlowCompletedTest
+      blocked by: T-06, T-08
+
+## S2 stockGone
+path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableResult] > StockUnavailable
+      > sendStockUnavailableNotification > end stockGone
+review: [ ]
+
+- [ ] T-10 bounded AFK startOrderCheckout unavailable: persist nothing, emit StockUnavailable (orderId, customer, unavailableItems from the result), answer 409 with StockUnavailable body
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:88-92, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:162-172, ../orders-checkout-api/openapi-overlay.yml
+      test data: inventory stub SKU-004 (stub-driven, no row: the order is never persisted)
+      tests: OrdersCheckoutServiceTest#startOrderCheckoutStockUnavailableTest, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_409
+      blocked by: T-06
+- [ ] T-11 bounded AFK Flow test stockGone (orders side): POST start-checkout with SKU-004 answers 409, no Order row, StockUnavailable emitted
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-343
+      tests: PlaceOrderFlowStockGoneTest
+      blocked by: T-10
+
+## S3 orderCancelled
+path: ... > PaymentDeclined | PaymentRetryExhausted | PaymentVoided | PaymentVoidFailed | ReservationExpired
+      > releaseStock / expireReservation > StockReleased > cancelOrder > OrderCancelled
+      > sendOrderCancelledNotification > end orderCancelled
+review: [ ]
+
+- [ ] T-12 bounded AFK cancelOrder: load by orderId, CREATED or CONFIRMED to CANCELLED, cancellationReason = input.reason, cancelledAt, persist, emit OrderCancelled; no-op, no event, on CANCELLED
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:300-310, ../orders-checkout-api/domain-model.zdl:117-121, ../orders-checkout-api/domain-model.zdl:141-144, ../orders-checkout-api/domain-model.zdl:195-205
+      test data: data.sql (C-03 from CREATED, C-04 from CONFIRMED, C-07 redelivery)
+      tests: OrdersCheckoutServiceTest#cancelOrderTest
+      blocked by: T-02, T-03
+- [ ] T-13 mechanical AFK StockReleasedConsumerService: map StockReleased (orderId, reason name) to CancelOrderInput and call cancelOrder
+      model: ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/domain-model.zdl:117-121, ../catalog-inventory-api/domain-model.zdl:74-80
+      test data: data.sql (C-03)
+      tests: StockReleasedConsumerServiceTest
+      blocked by: T-12
+- [ ] T-14 bounded AFK Flow test orderCancelled (orders side), one case per cause: PAYMENT_DECLINED, PAYMENT_RETRY_EXHAUSTED, RESERVATION_EXPIRED from CREATED; PAYMENT_VOIDED, PAYMENT_VOID_FAILED from CONFIRMED; GET shows CANCELLED with the reason
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:262-266, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-344
+      test data: data.sql (C-03, C-04, C-06..C-10)
+      tests: PlaceOrderFlowCancelledTest
+      blocked by: T-13
+
+## S4 late authorization rejected
+path: ... > PaymentAuthorized > confirmOrder[stock-not-held | order-cancelled] > OrderConfirmationRejected
+      > voidPayment > PaymentVoided > releaseStock > StockReleased > cancelOrder > end orderCancelled
+review: [ ]
+
+- [ ] T-15 bounded AFK confirmOrder rejected: on CANCELLED emit OrderConfirmationRejected ORDER_CANCELLED; on NOT_HELD emit it with STOCK_NOT_HELD; no state change (EventsMapper asOrderConfirmationRejected with reason and rejectedAt)
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:147-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:206-214, ../catalog-inventory-api/domain-model.zdl:115-125
+      test data: data.sql (C-05 stock-not-held, C-06 order-cancelled)
+      tests: OrdersCheckoutServiceTest#confirmOrderRejectedTest
+      blocked by: T-07
+- [ ] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164
+      test data: data.sql (C-05, C-06)
+      tests: PlaceOrderFlowLateAuthorizationTest
+      blocked by: T-08, T-15
+
+## S5 polish
+review: [ ]
+
+- [ ] T-17 mechanical AFK getOrder read side: 200 for CREATED (C-02), CONFIRMED (C-01), CANCELLED (C-06) and 404 for an unknown id
+      model: ../orders-checkout-api/domain-model.zdl:146-147
+      test data: data.sql (C-01, C-02, C-06)
+      tests: OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testGetOrder_400, OrdersCheckoutApiControllerTest#getOrderTest
+      blocked by: T-01

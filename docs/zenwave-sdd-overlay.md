@@ -74,7 +74,13 @@ mkdir -p target && mvn -q -DskipTests clean compile 2>&1 | tee target/compile.lo
 # focused tests of a task (the implementer runs only these)
 mvn -q test -Dtest='<TestClass>'
 # full suite with integration tests and containers (once per slice review)
-# <after generation: full suite takes about N minutes, needs Docker (Testcontainers starts the docker-compose PostgreSQL / Kafka / Schema Registry)>
+# about 4.5 minutes (260 s, 2026-11-25); needs Docker (Testcontainers starts the docker-compose PostgreSQL / Kafka / Schema Registry).
+# Surefire failures stop the build before the integration tests: add -Dmaven.test.failure.ignore=true to see both.
+# known failing at the baseline (2026-11-25), each fixed by a board task (docs/tasks.md tests:):
+#   OrdersCheckoutServiceTest.getOrderTest, OrderRepositoryIntegrationTest.updateTest, OrdersCheckoutApiControllerTest.getOrderTest,
+#   OrdersCheckoutApiIntegrationTest.testGetOrder_200/_400, .testStartOrderCheckout_400: generated test issues, no datasource -> T-01, T-17
+#   OrdersCheckoutApiControllerTest.startOrderCheckoutTest, OrdersCheckoutApiIntegrationTest.testStartOrderCheckout_201: not implemented -> T-06, T-09
+#   OrdersCheckoutApiIntegrationTest.testStartOrderCheckout_409: not implemented -> T-10
 mvn -q verify
 # lint the models
 bash .zenwave/bin/lint-zdl.sh --strict ../orders-checkout-api/domain-model.zdl
