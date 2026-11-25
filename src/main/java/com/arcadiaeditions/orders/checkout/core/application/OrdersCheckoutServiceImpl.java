@@ -88,23 +88,27 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
     }
 
     public Order confirmOrder(ConfirmOrderInput input) {
-        // TODO: call CatalogInventoryZdl InventoryService.confirmStockReservation(ConfirmStockReservationInput) ->
-        // StockReservation
-        //       then emit one of: StockReservationConfirmed
 
         log.debug("Request confirmOrder: {}", input);
 
-        // TODO CUSTOM_REQUIRED: load the Order this transition applies to, e.g. by a correlation key in the input
-        Optional<Order> foundOrder = Optional.empty();
-        var order = foundOrder
-                .map(existingOrder -> {
-                    OrderTransitions.ensureCanConfirmOrder(existingOrder);
-                    ordersCheckoutServiceMapper.update(existingOrder, input);
-                    existingOrder.setStatus(OrderStatus.CONFIRMED);
-                    return existingOrder;
-                })
-                .map(orderRepository::save)
-                .orElseThrow();
+        var existing = orderRepository.findByOrderId(input.getOrderId()).orElseThrow();
+        if (existing.getStatus() == OrderStatus.CONFIRMED) {
+            // redelivery of PaymentAuthorized: no inventory call, no event
+            return existing;
+        }
+        if (existing.getStatus() == OrderStatus.CANCELLED) {
+            // OrderConfirmationRejected ORDER_CANCELLED: task T-15
+            throw new UnsupportedOperationException("ORDER_CANCELLED branch of confirmOrder: task T-15");
+        }
+        OrderTransitions.ensureCanConfirmOrder(existing);
+        var confirmation = inventoryClient.confirmStockReservation(existing.getOrderId());
+        if (!(confirmation instanceof StockReservationConfirmedResult)) {
+            // OrderConfirmationRejected STOCK_NOT_HELD: task T-15
+            throw new UnsupportedOperationException("STOCK_NOT_HELD branch of confirmOrder: task T-15");
+        }
+        existing.setStatus(OrderStatus.CONFIRMED);
+        existing.setConfirmedAt(Instant.now(clock));
+        var order = orderRepository.save(existing);
         // emit events
         var orderConfirmed = eventsMapper.asOrderConfirmed(order);
         eventsProducer.onOrderConfirmed(orderConfirmed);
