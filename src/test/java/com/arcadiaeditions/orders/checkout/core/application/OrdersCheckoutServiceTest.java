@@ -75,6 +75,46 @@ class OrdersCheckoutServiceTest {
     }
 
     @Test
+    void startOrderCheckoutStockUnavailableTest() {
+        var input = new StartOrderCheckoutInput()
+                .setCustomerId("CUST-100")
+                .setCustomerEmail("customer100@example.com")
+                .setPaymentMethodId("PM-100")
+                .setCurrency("EUR")
+                .addItems(new OrderItemInput().setSku("SKU-004").setQuantity(3).setUnitPrice(new BigDecimal("9.99")))
+                .setShippingAddress(new ShippingAddressInput()
+                        .setName("Ada Customer")
+                        .setLine1("1 Main St")
+                        .setCity("Madrid")
+                        .setPostalCode("28001")
+                        .setCountry("ES"));
+        var before = orderRepository.count();
+
+        var ex = assertThrows(StockUnavailableException.class, () -> ordersCheckoutService.startOrderCheckout(input));
+
+        assertEquals("ORD-100", ex.getOrderId());
+        assertEquals(1, ex.getUnavailableItems().size());
+        assertEquals("SKU-004", ex.getUnavailableItems().get(0).sku());
+        assertEquals(3, ex.getUnavailableItems().get(0).requestedQuantity());
+        assertEquals(0, ex.getUnavailableItems().get(0).availableQuantity());
+        assertEquals(before, orderRepository.count());
+        assertTrue(orderRepository.findByOrderId("ORD-100").isEmpty());
+
+        var producer = context.getEventsProducerInMemoryContext().ordersCheckoutEventsProducer();
+        assertEquals(0, producer.getOnOrderCreatedCapturedMessages().size());
+        assertEquals(1, producer.getOnStockUnavailableCapturedMessages().size());
+        var event = (com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable)
+                producer.getOnStockUnavailableCapturedMessages().get(0).getPayload();
+        assertEquals("ORD-100", event.getOrderId().toString());
+        assertEquals("CUST-100", event.getCustomerId().toString());
+        assertEquals("customer100@example.com", event.getCustomerEmail().toString());
+        assertEquals(1, event.getUnavailableItems().size());
+        assertEquals("SKU-004", event.getUnavailableItems().get(0).getSku().toString());
+        assertEquals(3, event.getUnavailableItems().get(0).getRequestedQuantity());
+        assertEquals(0, event.getUnavailableItems().get(0).getAvailableQuantity());
+    }
+
+    @Test
     void confirmOrderTest() {
         var order = ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-002"));
 

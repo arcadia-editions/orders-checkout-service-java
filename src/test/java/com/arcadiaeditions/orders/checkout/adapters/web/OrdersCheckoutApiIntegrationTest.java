@@ -139,23 +139,21 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
     public void testStartOrderCheckout_409() {
         String requestBody = """
             {
-              "customerId" : "customerId-tkflgygvnbo7bka",
-              "customerEmail" : "jospeh.ebert@hotmail.com",
-              "paymentMethodId" : "paymentMethodId-3dou9278ex",
-              "currency" : "currency-cb3ts3zef4uz0ru",
+              "customerId" : "CUS-100",
+              "customerEmail" : "reader@example.com",
+              "paymentMethodId" : "PM-100",
+              "currency" : "EUR",
               "items" : [ {
-                "sku" : "sku-qelk",
+                "sku" : "SKU-004",
                 "quantity" : 8,
                 "unitPrice" : 13
               } ],
               "shippingAddress" : {
-                "name" : "name-0uy7j5ljouxcemr7rgc",
-                "line1" : "line1-czivz9h4",
-                "line2" : "line2-x",
-                "city" : "South Craig",
-                "region" : "region-jfgr0z1",
-                "postalCode" : "postalCode-ba0z3a9v3",
-                "country" : "Honduras"
+                "name" : "Reader One",
+                "line1" : "1 Main St",
+                "city" : "Madrid",
+                "postalCode" : "28001",
+                "country" : "ES"
               }
             }
         """;

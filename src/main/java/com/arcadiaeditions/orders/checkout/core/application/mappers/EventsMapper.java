@@ -25,4 +25,14 @@ public interface EventsMapper {
     com.arcadiaeditions.orders.checkout.events.avro.OrderCancelled asOrderCancelled(Order order);
 
     com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable asStockUnavailable(Order order);
+
+    @Mapping(target = "orderId", source = "orderId")
+    @Mapping(target = "customerId", source = "input.customerId")
+    @Mapping(target = "customerEmail", source = "input.customerEmail")
+    @Mapping(target = "unavailableItems", source = "unavailableItems")
+    com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable asStockUnavailable(
+            StartOrderCheckoutInput input,
+            String orderId,
+            java.util.List<com.arcadiaeditions.orders.checkout.core.outbound.inventory.StockUnavailableResult.StockUnavailableLine>
+                    unavailableItems);
 }

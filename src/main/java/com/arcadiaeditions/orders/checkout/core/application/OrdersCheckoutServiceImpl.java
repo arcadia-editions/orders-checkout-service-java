@@ -63,9 +63,16 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
                 input.getItems().stream()
                         .map(item -> new ReserveStockItem(item.getSku(), item.getQuantity()))
                         .toList());
-        if (!(reservation instanceof StockReservedResult)) {
-            // StockUnavailable (409, nothing persisted, event StockUnavailable) is task T-10
-            throw new UnsupportedOperationException("StockUnavailable branch of startOrderCheckout: task T-10");
+        if (reservation instanceof StockUnavailableResult unavailable) {
+            // nothing persisted: only the event, and the exception the web adapter answers 409 from
+            eventsProducer.onStockUnavailable(
+                    eventsMapper.asStockUnavailable(input, orderId, unavailable.unavailableItems()));
+            throw new StockUnavailableException(
+                    orderId,
+                    unavailable.unavailableItems().stream()
+                            .map(line -> new StockUnavailableException.Line(
+                                    line.sku(), line.requestedQuantity(), line.availableQuantity()))
+                            .toList());
         }
 
         var order = ordersCheckoutServiceMapper.update(new Order(), input);
