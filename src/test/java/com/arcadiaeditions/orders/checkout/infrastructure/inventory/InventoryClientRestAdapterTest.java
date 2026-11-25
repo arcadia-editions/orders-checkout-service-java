@@ -125,6 +125,46 @@ class InventoryClientRestAdapterTest {
     }
 
     @Test
+    void reserveStockReservedWithoutBodyIsAContractViolation() {
+        server.expect(requestTo(BASE_URL + "/inventory/reservations/reserve"))
+                .andRespond(withStatus(HttpStatus.CREATED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                        {"outcome":"RESERVED"}
+                        """));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> adapter.reserveStock("ORD-100", List.of(new ReserveStockItem("SKU-002", 2))));
+    }
+
+    @Test
+    void reserveStockUnavailableWithoutBodyIsAContractViolation() {
+        server.expect(requestTo(BASE_URL + "/inventory/reservations/reserve"))
+                .andRespond(withStatus(HttpStatus.CREATED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                        {"outcome":"UNAVAILABLE"}
+                        """));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> adapter.reserveStock("ORD-100", List.of(new ReserveStockItem("SKU-002", 2))));
+    }
+
+    @Test
+    void confirmStockReservationConfirmedWithoutBodyIsAContractViolation() {
+        server.expect(requestTo(BASE_URL + "/inventory/reservations/confirm"))
+                .andRespond(withStatus(HttpStatus.CREATED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                        {"outcome":"CONFIRMED"}
+                        """));
+
+        assertThrows(IllegalStateException.class, () -> adapter.confirmStockReservation("ORD-002"));
+    }
+
+    @Test
     void httpErrorIsATechnicalFailure() {
         server.expect(requestTo(BASE_URL + "/inventory/reservations/confirm")).andRespond(withBadRequest());
 

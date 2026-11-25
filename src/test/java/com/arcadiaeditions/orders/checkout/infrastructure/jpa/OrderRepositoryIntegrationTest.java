@@ -1,5 +1,6 @@
 package com.arcadiaeditions.orders.checkout.infrastructure.jpa;
 
+import com.arcadiaeditions.orders.checkout.config.TestClock;
 import com.arcadiaeditions.orders.checkout.core.domain.*;
 import com.arcadiaeditions.orders.checkout.core.outbound.jpa.OrderRepository;
 import jakarta.persistence.EntityManager;
@@ -82,8 +83,7 @@ class OrderRepositoryIntegrationTest extends BaseRepositoryIntegrationTest {
         var id = 1L;
         var items = List.of(new OrderItem());
         var address = new ShippingAddress();
-        // Approved test now (overlay). A fixed Clock is T-02; this test only needs one instant.
-        var now = Instant.parse("2026-10-14T10:00:00Z");
+        var now = TestClock.NOW;
         var order = orderRepository.findById(id).orElseThrow();
         order.setOrderId("");
         order.setStatus(OrderStatus.values()[0]);

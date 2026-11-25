@@ -70,10 +70,12 @@ public class InventoryClientRestAdapter implements InventoryClient {
         return switch (response.outcome()) {
             case "CONFIRMED" -> {
                 var confirmed = response.confirmed();
-                yield confirmed == null
-                        ? new StockReservationConfirmedResult(orderId, null)
-                        : new StockReservationConfirmedResult(
-                                orderIdOr(confirmed.orderId(), orderId), confirmed.confirmedAt());
+                if (confirmed == null) {
+                    throw new IllegalStateException(
+                            "confirmStockReservation: outcome CONFIRMED without confirmed body for " + orderId);
+                }
+                yield new StockReservationConfirmedResult(
+                        orderIdOr(confirmed.orderId(), orderId), confirmed.confirmedAt());
             }
             case "NOT_HELD" -> {
                 var notHeld = response.notHeld();
@@ -88,7 +90,7 @@ public class InventoryClientRestAdapter implements InventoryClient {
 
     private static StockReservedResult toReserved(String orderId, StockReservedResultJson reserved) {
         if (reserved == null) {
-            return new StockReservedResult(orderId, null, List.of());
+            throw new IllegalStateException("reserveStock: outcome RESERVED without reserved body for " + orderId);
         }
         var lines = reserved.reservations() == null
                 ? List.<StockReservedResult.StockReservedLine>of()
@@ -101,7 +103,8 @@ public class InventoryClientRestAdapter implements InventoryClient {
 
     private static StockUnavailableResult toUnavailable(String orderId, StockUnavailableResultJson unavailable) {
         if (unavailable == null) {
-            return new StockUnavailableResult(orderId, List.of());
+            throw new IllegalStateException(
+                    "reserveStock: outcome UNAVAILABLE without unavailable body for " + orderId);
         }
         var lines = unavailable.unavailableItems() == null
                 ? List.<StockUnavailableResult.StockUnavailableLine>of()
