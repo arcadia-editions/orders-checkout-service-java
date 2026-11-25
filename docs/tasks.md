@@ -66,11 +66,12 @@ review: [ ]
       tests: OrdersCheckoutServiceTest#confirmOrderTest
       blocked by: T-02, T-03, T-05
       done: claude-code claude-sonnet
-- [/] T-08 mechanical AFK PaymentAuthorizedConsumerService: map PaymentAuthorized.orderId to ConfirmOrderInput and call confirmOrder
+- [x] T-08 mechanical AFK PaymentAuthorizedConsumerService: map PaymentAuthorized.orderId to ConfirmOrderInput and call confirmOrder
       model: ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:113-115
       test data: data.sql (C-02)
       tests: PaymentAuthorizedConsumerServiceTest
       blocked by: T-07
+      done: grok grok-4.7
 - [ ] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-342
       test data: data.sql (C-01, C-02)
