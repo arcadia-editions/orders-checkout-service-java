@@ -113,6 +113,10 @@ public class InMemoryJpaRepository<T> implements JpaRepository<T, Long> {
         }
         Long id = firstNonNull(readField(entity, "id"), primaryKeyGenerator.next());
         writeField(entity, "id", id);
+        // like JPA on persist of an entity with @Version: a new entity starts at version 0
+        if (FieldUtils.getField(entity.getClass(), "version", true) != null && readField(entity, "version") == null) {
+            writeField(entity, "version", 0);
+        }
         entities.put(id, entity);
         return entity;
     }

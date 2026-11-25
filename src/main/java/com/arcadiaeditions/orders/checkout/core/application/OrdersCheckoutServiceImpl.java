@@ -5,6 +5,8 @@ import com.arcadiaeditions.orders.checkout.core.application.mappers.*;
 import com.arcadiaeditions.orders.checkout.core.domain.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.dtos.*;
+import com.arcadiaeditions.orders.checkout.core.outbound.ids.OrderIdGenerator;
+import com.arcadiaeditions.orders.checkout.core.outbound.inventory.*;
 import com.arcadiaeditions.orders.checkout.core.outbound.jpa.*;
 // import com.arcadiaeditions.orders.checkout.events.avro.*;
 import java.math.*;
@@ -32,15 +34,23 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
     private final EventsMapper eventsMapper = EventsMapper.INSTANCE;
     private final OrdersCheckoutEventsProducer eventsProducer;
     private final Clock clock;
+    private final InventoryClient inventoryClient;
+    private final OrderIdGenerator orderIdGenerator;
 
     /**
      * Constructor.
      */
     public OrdersCheckoutServiceImpl(
-            OrderRepository orderRepository, OrdersCheckoutEventsProducer eventsProducer, Clock clock) {
+            OrderRepository orderRepository,
+            OrdersCheckoutEventsProducer eventsProducer,
+            Clock clock,
+            InventoryClient inventoryClient,
+            OrderIdGenerator orderIdGenerator) {
         this.orderRepository = orderRepository;
         this.eventsProducer = eventsProducer;
         this.clock = clock;
+        this.inventoryClient = inventoryClient;
+        this.orderIdGenerator = orderIdGenerator;
     }
 
     /** Clock used for createdAt, confirmedAt, cancelledAt and event timestamps such as rejectedAt. */
@@ -49,17 +59,31 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
     }
 
     public Order startOrderCheckout(StartOrderCheckoutInput input) {
-        // TODO: call CatalogInventoryZdl InventoryService.reserveStock(ReserveStockInput) -> ReserveStockResult
 
         log.debug("Request startOrderCheckout: {}", input);
 
+        var orderId = orderIdGenerator.nextOrderId();
+        var reservation = inventoryClient.reserveStock(
+                orderId,
+                input.getItems().stream()
+                        .map(item -> new ReserveStockItem(item.getSku(), item.getQuantity()))
+                        .toList());
+        if (!(reservation instanceof StockReservedResult)) {
+            // StockUnavailable (409, nothing persisted, event StockUnavailable) is task T-10
+            throw new UnsupportedOperationException("StockUnavailable branch of startOrderCheckout: task T-10");
+        }
+
         var order = ordersCheckoutServiceMapper.update(new Order(), input);
-        // TODO: implement this method
+        order.setOrderId(orderId);
+        order.setStatus(OrderStatus.CREATED);
+        order.setCreatedAt(Instant.now(clock));
+        order.setTotalAmount(input.getItems().stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        order = orderRepository.save(order);
         // emit events
         var orderCreated = eventsMapper.asOrderCreated(order);
         eventsProducer.onOrderCreated(orderCreated);
-        var stockUnavailable = eventsMapper.asStockUnavailable(order);
-        eventsProducer.onStockUnavailable(stockUnavailable);
         return order;
     }
 
