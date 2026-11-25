@@ -23,7 +23,7 @@ The flow also references the other contexts' ZDLs: `../catalog-inventory-api`, `
 | Domain summary | `docs/domain.md` |
 | Board of the flow in progress | `docs/tasks.md` (archived boards in `docs/tasks/`) |
 | Model gap proposals | `docs/proposals/` |
-| Test data and scenario matrix | `<after test data: src/test/resources/data.sql, and what its header holds: the chains, the fixed test "now" and how tests read it (a Clock)>` |
+| Test data and scenario matrix | `src/test/resources/data.sql` (header: one example per entity, chain `C-01`) and `src/test/resources/data/jpa/<Entity>/<n>.json` |
 | Generation script | `zenwave-scripts.zw` |
 
 **The models are read from raw GitHub URLs, not a packaged artifact.** `zenwave-scripts.zw` (`zdlFile`,
