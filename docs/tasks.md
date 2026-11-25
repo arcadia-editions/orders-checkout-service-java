@@ -83,7 +83,7 @@ review: [ ]
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:113, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155, ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
       fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (FIX FIRST)
       tests: PlaceOrderFlowKafkaIntegrationTest
-- [ ] T-21 bounded AFK S1 review fixes: recording InventoryClientStub and asserts that startOrderCheckout reserved the persisted orderId with the requested sku/quantity lines; OrderConfirmed.version after the confirm write (assert in PlaceOrderFlowCompletedIntegrationTest, emit after flush if stale); TestClock.NOW in OrdersCheckoutApiControllerTest
+- [/] T-21 bounded AFK S1 review fixes: recording InventoryClientStub and asserts that startOrderCheckout reserved the persisted orderId with the requested sku/quantity lines; OrderConfirmed.version after the confirm write (assert in PlaceOrderFlowCompletedIntegrationTest, emit after flush if stale); TestClock.NOW in OrdersCheckoutApiControllerTest
       fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (SHOULD FIX, NOTEs)
       tests: OrdersCheckoutServiceTest, OrdersCheckoutApiControllerTest, PlaceOrderFlowCompletedIntegrationTest
       blocked by: T-10
@@ -93,12 +93,13 @@ path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableRes
       > sendStockUnavailableNotification > end stockGone
 review: [ ]
 
-- [/] T-10 bounded AFK startOrderCheckout unavailable: persist nothing, emit StockUnavailable (orderId, customer, unavailableItems from the result), answer 409 with StockUnavailable body
+- [x] T-10 bounded AFK startOrderCheckout unavailable: persist nothing, emit StockUnavailable (orderId, customer, unavailableItems from the result), answer 409 with StockUnavailable body
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:88-92, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:162-172, ../orders-checkout-api/openapi-overlay.yml
       test data: inventory stub SKU-004 (stub-driven, no row: the order is never persisted)
       tests: OrdersCheckoutServiceTest#startOrderCheckoutStockUnavailableTest, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_409
       blocked by: T-06
-- [ ] T-11 bounded AFK Flow test stockGone (orders side): POST start-checkout with SKU-004 answers 409, no Order row, StockUnavailable emitted
+      done: claude-code claude-sonnet
+- [/] T-11 bounded AFK Flow test stockGone (orders side): POST start-checkout with SKU-004 answers 409, no Order row, StockUnavailable emitted
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-343
       tests: PlaceOrderFlowStockGoneIntegrationTest
       blocked by: T-10
