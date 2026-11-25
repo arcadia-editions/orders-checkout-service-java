@@ -114,17 +114,16 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
 
         log.debug("Request cancelOrder: {}", input);
 
-        // TODO CUSTOM_REQUIRED: load the Order this transition applies to, e.g. by a correlation key in the input
-        Optional<Order> foundOrder = Optional.empty();
-        var order = foundOrder
-                .map(existingOrder -> {
-                    OrderTransitions.ensureCanCancelOrder(existingOrder);
-                    ordersCheckoutServiceMapper.update(existingOrder, input);
-                    existingOrder.setStatus(OrderStatus.CANCELLED);
-                    return existingOrder;
-                })
-                .map(orderRepository::save)
-                .orElseThrow();
+        var existing = orderRepository.findByOrderId(input.getOrderId()).orElseThrow();
+        if (existing.getStatus() == OrderStatus.CANCELLED) {
+            // redelivery of StockReleased: no change, no event
+            return existing;
+        }
+        OrderTransitions.ensureCanCancelOrder(existing);
+        existing.setStatus(OrderStatus.CANCELLED);
+        existing.setCancellationReason(input.getReason());
+        existing.setCancelledAt(Instant.now(clock));
+        var order = orderRepository.save(existing);
         // emit events
         var orderCancelled = eventsMapper.asOrderCancelled(order);
         eventsProducer.onOrderCancelled(orderCancelled);
