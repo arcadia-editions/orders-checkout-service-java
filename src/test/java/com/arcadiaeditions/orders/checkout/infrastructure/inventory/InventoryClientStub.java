@@ -30,6 +30,33 @@ public class InventoryClientStub implements InventoryClient {
 
     private final Set<String> notHeldOrderIds = new HashSet<>(Set.of("ORD-005"));
 
+    /** One recorded reserveStock call. */
+    public record ReserveStockCall(String orderId, List<ReserveStockItem> items) {}
+
+    private final List<ReserveStockCall> reserveStockCalls = new ArrayList<>();
+
+    private final List<String> confirmStockReservationCalls = new ArrayList<>();
+
+    /** The reserveStock calls received, in order. */
+    public List<ReserveStockCall> reserveStockCalls() {
+        return reserveStockCalls;
+    }
+
+    /** The orderIds of the confirmStockReservation calls received, in order. */
+    public List<String> confirmStockReservationCalls() {
+        return confirmStockReservationCalls;
+    }
+
+    /** Forgets the recorded calls and restores the default answers. */
+    public void reset() {
+        reserveStockCalls.clear();
+        confirmStockReservationCalls.clear();
+        unavailableSkus.clear();
+        unavailableSkus.add("SKU-004");
+        notHeldOrderIds.clear();
+        notHeldOrderIds.add("ORD-005");
+    }
+
     public InventoryClientStub(Clock clock) {
         this.clock = clock;
     }
@@ -46,6 +73,7 @@ public class InventoryClientStub implements InventoryClient {
 
     @Override
     public ReserveStockResult reserveStock(String orderId, List<ReserveStockItem> items) {
+        reserveStockCalls.add(new ReserveStockCall(orderId, List.copyOf(items)));
         var unavailable = items.stream()
                 .filter(item -> unavailableSkus.contains(item.sku()))
                 .map(item -> new StockUnavailableResult.StockUnavailableLine(item.sku(), item.quantity(), 0))
@@ -65,6 +93,7 @@ public class InventoryClientStub implements InventoryClient {
 
     @Override
     public ConfirmStockReservationResult confirmStockReservation(String orderId) {
+        confirmStockReservationCalls.add(orderId);
         if (notHeldOrderIds.contains(orderId)) {
             return new StockReservationNotHeldResult(orderId);
         }

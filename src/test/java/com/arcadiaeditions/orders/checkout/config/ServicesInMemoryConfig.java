@@ -51,6 +51,7 @@ public class ServicesInMemoryConfig extends RepositoriesInMemoryConfig {
 
         var testDataLoader = new TestDataLoader(List.of(Order.class, OrderItem.class, ShippingAddress.class));
         var orders = _orders != null ? _orders : testDataLoader.loadCollectionTestDataAsObjects(Order.class);
+        inventoryClient.reset();
         orderRepository().deleteAll();
         orderRepository().saveAll(orders);
     }

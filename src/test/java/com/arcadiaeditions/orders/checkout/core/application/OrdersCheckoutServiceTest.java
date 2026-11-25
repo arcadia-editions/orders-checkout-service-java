@@ -11,10 +11,12 @@ import com.arcadiaeditions.orders.checkout.core.application.mappers.*;
 import com.arcadiaeditions.orders.checkout.core.domain.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.dtos.*;
+import com.arcadiaeditions.orders.checkout.core.outbound.inventory.ReserveStockItem;
 import com.arcadiaeditions.orders.checkout.core.outbound.jpa.*;
 import com.arcadiaeditions.orders.checkout.infrastructure.jpa.inmemory.*;
 import java.math.BigDecimal;
 import java.time.*;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -72,6 +74,14 @@ class OrdersCheckoutServiceTest {
         assertEquals(99.97, event.getAmount(), 0.0001);
         assertEquals("EUR", event.getCurrency().toString());
         assertNotNull(event.getVersion());
+
+        var reserved = context.inventoryClient().reserveStockCalls();
+        assertEquals(1, reserved.size());
+        assertEquals("ORD-100", reserved.get(0).orderId());
+        assertEquals(
+                List.of(new ReserveStockItem("SKU-002", 2), new ReserveStockItem("SKU-003", 1)),
+                reserved.get(0).items());
+        assertEquals(0, context.inventoryClient().confirmStockReservationCalls().size());
     }
 
     @Test
@@ -132,6 +142,8 @@ class OrdersCheckoutServiceTest {
         assertEquals(2, event.getItems().size());
         assertEquals("SKU-002", event.getItems().get(0).getSku().toString());
         assertEquals(2, event.getItems().get(0).getQuantity());
+        assertEquals(List.of("ORD-002"), context.inventoryClient().confirmStockReservationCalls());
+        assertEquals(0, context.inventoryClient().reserveStockCalls().size());
         assertEquals("2 Book Lane", event.getShippingAddress().getLine1().toString());
         assertEquals("ES", event.getShippingAddress().getCountry().toString());
     }
@@ -143,9 +155,12 @@ class OrdersCheckoutServiceTest {
         // C-05: ORD-005 CREATED, inventory answers NOT_HELD
         var notHeld = ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-005"));
         assertEquals(OrderStatus.CREATED, notHeld.getStatus());
-        assertEquals(OrderStatus.CREATED, orderRepository.findByOrderId("ORD-005").orElseThrow().getStatus());
+        assertEquals(
+                OrderStatus.CREATED,
+                orderRepository.findByOrderId("ORD-005").orElseThrow().getStatus());
         assertEquals(0, producer.getOnOrderConfirmedCapturedMessages().size());
-        assertEquals(1, producer.getOnOrderConfirmationRejectedCapturedMessages().size());
+        assertEquals(
+                1, producer.getOnOrderConfirmationRejectedCapturedMessages().size());
         var e1 = (com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmationRejected)
                 producer.getOnOrderConfirmationRejectedCapturedMessages().get(0).getPayload();
         assertEquals("ORD-005", e1.getOrderId().toString());
@@ -157,9 +172,12 @@ class OrdersCheckoutServiceTest {
         context.inventoryClient().notHeldOrderIds().add("ORD-006");
         var cancelled = ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-006"));
         assertEquals(OrderStatus.CANCELLED, cancelled.getStatus());
-        assertEquals(OrderStatus.CANCELLED, orderRepository.findByOrderId("ORD-006").orElseThrow().getStatus());
+        assertEquals(
+                OrderStatus.CANCELLED,
+                orderRepository.findByOrderId("ORD-006").orElseThrow().getStatus());
         assertEquals(0, producer.getOnOrderConfirmedCapturedMessages().size());
-        assertEquals(2, producer.getOnOrderConfirmationRejectedCapturedMessages().size());
+        assertEquals(
+                2, producer.getOnOrderConfirmationRejectedCapturedMessages().size());
         var e2 = (com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmationRejected)
                 producer.getOnOrderConfirmationRejectedCapturedMessages().get(1).getPayload();
         assertEquals("ORD-006", e2.getOrderId().toString());
