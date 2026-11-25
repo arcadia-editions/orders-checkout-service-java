@@ -20,9 +20,12 @@ class ArchitectureTest {
      * <ul>
      * <li>Domain: has no dependencies on other layers.</li>
      * <li>Inbound/Outbound Interfaces: has dependencies only on Domain layer.</li>
-     * <li>Application: has dependencies only on Inbound/Outbound Interfaces and Domain layer.</li>
+     * <li>Application: has dependencies only on Inbound/Outbound Interfaces, Domain, the generated AsyncAPI SDK and Avro models.</li>
      * <li>Infrastructure: has dependencies only on Outbound Interfaces and Domain layer.</li>
-     * <li>Adapters: has dependencies only on Inbound Interfaces and Domain layer.</li>
+     * <li>Adapters: may access Inbound Interfaces, Domain, the generated AsyncAPI SDK and Avro models.</li>
+     * <li>Generated AsyncAPI SDK ({@code asyncapi.provider}, {@code asyncapi.client}) and Avro models ({@code events.avro})
+     * sit outside the hexagon. CoreApplication and Adapters may access both. The SDK may access the Avro models
+     * (producer payloads). Domain, inbound and outbound ports may not.</li>
      * </ul>
      */
     @ArchTest
@@ -41,11 +44,13 @@ class ArchitectureTest {
         .optionalLayer("Infrastructure").definedBy("..infrastructure..")
         .optionalLayer("Adapters").definedBy("..adapters..")
         .optionalLayer("Utils").definedBy("..utils..")
+        .optionalLayer("AsyncApiSdk").definedBy("..asyncapi..")
+        .optionalLayer("EventsAvro").definedBy("..events.avro..")
 
         .whereLayer("Utils").mayOnlyBeAccessedByLayers("Any")
         .whereLayer("Config").mayNotBeAccessedByAnyLayer()
         .whereLayer("CoreApplication").mayNotBeAccessedByAnyLayer()
-        .whereLayer("CoreApplication").mayOnlyAccessLayers("Utils", "Core", "CoreInbound", "CoreOutbound", "Domain")
+        .whereLayer("CoreApplication").mayOnlyAccessLayers("Utils", "Core", "CoreInbound", "CoreOutbound", "Domain", "AsyncApiSdk", "EventsAvro")
         .whereLayer("Infrastructure").mayOnlyBeAccessedByLayers("Config", "Core")
         .whereLayer("Infrastructure").mayOnlyAccessLayers("CoreOutbound", "Models", "Utils")
         .whereLayer("CoreInbound").mayOnlyAccessLayers("Models")
@@ -54,6 +59,10 @@ class ArchitectureTest {
         .whereLayer("CoreOutbound").mayOnlyBeAccessedByLayers("CoreApplication", "Infrastructure", "InfrastructureSearch")
         .whereLayer("Domain").mayOnlyAccessLayers("Domain")
         .whereLayer("SearchModel").mayOnlyAccessLayers("Domain")
+        .whereLayer("AsyncApiSdk").mayOnlyBeAccessedByLayers("CoreApplication", "Adapters")
+        .whereLayer("AsyncApiSdk").mayOnlyAccessLayers("EventsAvro")
+        .whereLayer("EventsAvro").mayOnlyBeAccessedByLayers("CoreApplication", "Adapters", "AsyncApiSdk")
+        .whereLayer("EventsAvro").mayOnlyAccessLayers("EventsAvro")
 
         .ignoreDependency(resideInAPackage("..config.."), alwaysTrue())
         ;
