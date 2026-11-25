@@ -17,10 +17,11 @@ service-all 0.2.0 (consumed Avro); ZFL at arcadia-editions-architecture tag base
 ## S0 Baseline
 review: [ ]
 
-- [/] T-01 mechanical AFK Generated tests that should pass do: getOrderTest with a fixture id, updateTest without Instant.now()/OrderItem equality, API tests with a datasource
+- [x] T-01 mechanical AFK Generated tests that should pass do: getOrderTest with a fixture id, updateTest without Instant.now()/OrderItem equality, API tests with a datasource
       test data: data/jpa/Order/1.json, data.sql (C-01, id 1)
       tests: OrdersCheckoutServiceTest, OrderRepositoryIntegrationTest, OrdersCheckoutApiControllerTest#getOrderTest, OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_400
-- [ ] T-02 mechanical AFK Inject a java.time.Clock (system clock in main, fixed 2026-10-14T10:00:00Z in tests) for every timestamp the service sets
+      done: grok grok-4.7
+- [/] T-02 mechanical AFK Inject a java.time.Clock (system clock in main, fixed 2026-10-14T10:00:00Z in tests) for every timestamp the service sets
       tests: OrdersCheckoutServiceTest
 - [ ] T-03 mechanical AFK OrderRepository.findByOrderId (JPA and in-memory twin): commands correlate by orderId
       model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:113-121
