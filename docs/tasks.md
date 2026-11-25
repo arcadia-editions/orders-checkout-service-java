@@ -100,10 +100,11 @@ review: [ ]
       tests: OrdersCheckoutServiceTest#startOrderCheckoutStockUnavailableTest, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_409
       blocked by: T-06
       done: claude-code claude-sonnet
-- [/] T-11 bounded AFK Flow test stockGone (orders side): POST start-checkout with SKU-004 answers 409, no Order row, StockUnavailable emitted
+- [x] T-11 bounded AFK Flow test stockGone (orders side): POST start-checkout with SKU-004 answers 409, no Order row, StockUnavailable emitted
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-343
       tests: PlaceOrderFlowStockGoneIntegrationTest
       blocked by: T-10
+      done: claude-code claude-sonnet
 
 ## S3 orderCancelled
 path: ... > PaymentDeclined | PaymentRetryExhausted | PaymentVoided | PaymentVoidFailed | ReservationExpired
