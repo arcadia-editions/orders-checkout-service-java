@@ -2,6 +2,7 @@ package com.arcadiaeditions.orders.checkout.core.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
@@ -75,7 +76,49 @@ class OrdersCheckoutServiceTest {
     }
 
     @Test
-    void confirmOrderTest() { // TODO: implement this test
+    void confirmOrderTest() {
+        var order = ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-002"));
+
+        assertEquals(OrderStatus.CONFIRMED, order.getStatus());
+        assertEquals(TestClock.NOW, order.getConfirmedAt());
+        assertEquals(order, orderRepository.findByOrderId("ORD-002").orElseThrow());
+
+        var producer = context.getEventsProducerInMemoryContext().ordersCheckoutEventsProducer();
+        assertEquals(1, producer.getOnOrderConfirmedCapturedMessages().size());
+        var event = (com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmed)
+                producer.getOnOrderConfirmedCapturedMessages().get(0).getPayload();
+        assertEquals("ORD-002", event.getOrderId().toString());
+        assertEquals("CUST-002", event.getCustomerId().toString());
+        assertEquals(TestClock.NOW.toString(), event.getConfirmedAt().toString());
+        assertEquals(2, event.getItems().size());
+        assertEquals("SKU-002", event.getItems().get(0).getSku().toString());
+        assertEquals(2, event.getItems().get(0).getQuantity());
+        assertEquals("2 Book Lane", event.getShippingAddress().getLine1().toString());
+        assertEquals("ES", event.getShippingAddress().getCountry().toString());
+    }
+
+    @Test
+    void confirmOrderRedeliveryOnConfirmedIsNoOp() {
+        // inventory would answer NOT_HELD if it were called: redelivery must not call it
+        context.inventoryClient().notHeldOrderIds().add("ORD-001");
+        var before = orderRepository.findByOrderId("ORD-001").orElseThrow();
+        var confirmedAt = before.getConfirmedAt();
+
+        var order = ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-001"));
+
+        assertEquals(OrderStatus.CONFIRMED, order.getStatus());
+        assertEquals(confirmedAt, order.getConfirmedAt());
+        var producer = context.getEventsProducerInMemoryContext().ordersCheckoutEventsProducer();
+        assertEquals(0, producer.getOnOrderConfirmedCapturedMessages().size());
+    }
+
+    @Test
+    void confirmOrderUnknownOrderIdThrows() {
+        assertThrows(
+                java.util.NoSuchElementException.class,
+                () -> ordersCheckoutService.confirmOrder(new ConfirmOrderInput().setOrderId("ORD-999")));
+        var producer = context.getEventsProducerInMemoryContext().ordersCheckoutEventsProducer();
+        assertEquals(0, producer.getOnOrderConfirmedCapturedMessages().size());
     }
 
     @Test
