@@ -26,23 +26,30 @@ The flow also references the other contexts' ZDLs: `../catalog-inventory-api`, `
 | Test data and scenario matrix | `src/test/resources/data.sql` (header: scenario and coverage matrices, chains `C-01`..`C-10`, assumptions, the fixed test "now" `2026-10-14T10:00:00Z` read by tests through a fixed `Clock`, not yet in the code) and `src/test/resources/data/jpa/<Entity>/<n>.json` |
 | Generation script | `zenwave-scripts.zw` |
 
-**The models are read from raw GitHub URLs, not a packaged artifact.** `zenwave-scripts.zw` (`zdlFile`,
-`openapiFile`) and `pom.xml` (`openapi.inputSpec`, `asyncapi.inputSpec`, `asyncapi.client.inputSpec`, the
-`*.avro.imports`) point at `https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/...`
-(client Avro imports also at `catalog-inventory-api`). The generated code reflects `main` on GitHub, not the local
-clone.
+**`zenwave-scripts.zw` and `pom.xml` read the models from released packages** (`@import(...)` and `classpath:`):
 
-- staleness check (prints nothing when the local clone matches what the build reads):
+- artifacts and versions: `com.arcadiaeditions.orders.checkout.orders-checkout:service-all:0.2.0` (the `@import` of
+  `zenwave-scripts.zw` and `pom.xml` `orders-checkout-api.version` must match) and, for the consumed Avro types,
+  `com.arcadiaeditions.catalog.inventory-management.catalog-inventory:service-all:0.2.0` (`catalog-inventory-api.version`).
+  Repository: `https://maven.pkg.github.com/arcadia-editions/arcadia-editions-architecture` (server id `github` in
+  `~/.m2/settings.xml`). Folder inside the jar: `com/arcadiaeditions/orders/checkout/orders-checkout/`.
+- regenerate: `ZW_FILE=zenwave-scripts.zw node ../api-product-workflows/scripts/zenwave/generate-from-zdl.mjs . .`
+  (`jbang zw` does not read `.zw` files; the script turns the `@import` into `-d`). Never `--force`.
+- extract the models when their repository is not cloned:
 
   ```bash
-  R=https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main
-  for f in domain-model.zdl openapi.yml asyncapi.yml asyncapi-client.yml; do
-    curl -fsSL "$R/$f" | diff -q --strip-trailing-cr - "../orders-checkout-api/$f" >/dev/null || echo "stale: $f"
-  done
+  P=com/arcadiaeditions/orders/checkout/orders-checkout; V=$(grep -o 'service-all:[^")]*' zenwave-scripts.zw | head -1 | cut -d: -f2)
+  JAR=~/.m2/repository/com/arcadiaeditions/orders/checkout/orders-checkout/service-all/$V/service-all-$V.jar
+  mkdir -p target/models && unzip -o -q -j "$JAR" "$P/*.zdl" "$P/*.yml" -d target/models
   ```
 
-- publish a model change: commit and push it to `main` of `orders-checkout-api` (and the sibling repositories it
-  touches); then regenerate here.
+- staleness check (prints nothing when the packaged copy matches the working copy):
+  `for f in domain-model.zdl openapi.yml asyncapi.yml asyncapi-client.yml; do diff -q --strip-trailing-cr "../orders-checkout-api/$f" "target/models/$f"; done`
+- release a model change: in `orders-checkout-api`, run `artifact-release.yml` (workflow_dispatch) for each changed artifact
+  (`domain-model`, `openapi`, `asyncapi-all`; it stamps the file versions and updates the architecture manifest), then
+  `service-all`; bump `orders-checkout-api.version` and the `@import`; regenerate.
+- residual coupling to `main` (not pinned by the package): the generated `asyncapi-client.yml` `$ref`s the producers'
+  `asyncapi.yml` on `refs/heads/main`, and `domain-model.zdl` `apis { ... }` points at `main` of the other contexts.
 
 **The ZFL's `@zdl(...)` paths** (`../../<context>-api/domain-model.zdl`, relative to `business-flows/`) resolve to
 the sibling clones above; no mapping needed. This service owns `orders-checkout-api/domain-model.zdl` only.

@@ -1,13 +1,14 @@
+@import("com.arcadiaeditions.orders.checkout.orders-checkout:service-all:0.2.0")
 // ZenWave Scripts File (.zw): plugins and configuration for ZenWave SDK code generation.
 //
 // The models and API contracts are owned by the orders-checkout-api repository and read from
-// its raw GitHub URLs (branch main). Nothing is generated into src/main/resources/public/apis:
+// its released service-all package (keep the version in sync with pom.xml orders-checkout-api.version). Nothing is generated into src/main/resources/public/apis:
 // the OpenAPI/AsyncAPI contracts are produced in that repository from its domain-model.zdl.
 //
 // Usage: Play button in the ZenWave IDE plugin, or copy the command line shown on hover.
 config {
 
-    zdlFile "https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/domain-model.zdl"
+    zdlFile "classpath:/com/arcadiaeditions/orders/checkout/orders-checkout/domain-model.zdl"
     databaseType postgresql
 
     layout CleanHexagonalProjectLayout
@@ -30,11 +31,11 @@ config {
         }
         /** Generates Spring MVC controllers from the OpenAPI specification (Web Adapters). */
         OpenAPIControllersPlugin {
-            openapiFile "https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/openapi.yml"
+            openapiFile "classpath:/com/arcadiaeditions/orders/checkout/orders-checkout/openapi.yml"
         }
         /** Generates API tests from the OpenAPI specification. */
         SpringWebTestClientPlugin {
-            openapiFile "https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/openapi.yml"
+            openapiFile "classpath:/com/arcadiaeditions/orders/checkout/orders-checkout/openapi.yml"
         }
     }
 }

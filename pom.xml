@@ -21,16 +21,19 @@
 		<openApiApiPackage>${basePackage}.adapters.web</openApiApiPackage>
 		<openApiModelPackage>${basePackage}.adapters.web.dtos</openApiModelPackage>
 
-		<openapi.inputSpec>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/openapi.yml</openapi.inputSpec>
-		<asyncapi.inputSpec>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/asyncapi.yml</asyncapi.inputSpec>
+		<!-- models and contracts: released service-all packages (GitHub Packages), never refs/heads/main -->
+		<orders-checkout-api.version>0.2.0</orders-checkout-api.version>
+		<catalog-inventory-api.version>0.2.0</catalog-inventory-api.version>
+		<openapi.inputSpec>com/arcadiaeditions/orders/checkout/orders-checkout/openapi.yml</openapi.inputSpec>
+		<asyncapi.inputSpec>classpath:com/arcadiaeditions/orders/checkout/orders-checkout/asyncapi.yml</asyncapi.inputSpec>
 		<!-- avro types referenced by name from the event schemas (comma separated, order matters: dependencies first) -->
-		<asyncapi.avro.imports>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/avro/StockUnavailableItem.avsc,https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/avro/OrderConfirmedItem.avsc,https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/avro/OrderConfirmedShippingAddress.avsc</asyncapi.avro.imports>
+		<asyncapi.avro.imports>classpath:com/arcadiaeditions/orders/checkout/orders-checkout/avro/StockUnavailableItem.avsc,classpath:com/arcadiaeditions/orders/checkout/orders-checkout/avro/OrderConfirmedItem.avsc,classpath:com/arcadiaeditions/orders/checkout/orders-checkout/avro/OrderConfirmedShippingAddress.avsc</asyncapi.avro.imports>
 		<asyncApiModelPackage>${basePackage}.asyncapi.provider.dtos</asyncApiModelPackage>
 		<asyncApiProducerApiPackage>${basePackage}.asyncapi.provider</asyncApiProducerApiPackage>
 		<asyncApiConsumerApiPackage>${basePackage}.asyncapi.provider</asyncApiConsumerApiPackage>
-		<asyncapi.client.inputSpec>https://raw.githubusercontent.com/arcadia-editions/orders-checkout-api/refs/heads/main/asyncapi-client.yml</asyncapi.client.inputSpec>
+		<asyncapi.client.inputSpec>classpath:com/arcadiaeditions/orders/checkout/orders-checkout/asyncapi-client.yml</asyncapi.client.inputSpec>
 		<!-- avro types referenced by name from the consumed event schemas (dependencies first) -->
-		<asyncapi.client.avro.imports>https://raw.githubusercontent.com/arcadia-editions/catalog-inventory-api/refs/heads/main/avro/StockReleaseReason.avsc,https://raw.githubusercontent.com/arcadia-editions/catalog-inventory-api/refs/heads/main/avro/StockReleasedItem.avsc</asyncapi.client.avro.imports>
+		<asyncapi.client.avro.imports>classpath:com/arcadiaeditions/catalog/inventory-management/catalog-inventory/avro/StockReleaseReason.avsc,classpath:com/arcadiaeditions/catalog/inventory-management/catalog-inventory/avro/StockReleasedItem.avsc</asyncapi.client.avro.imports>
 		<!-- generated AsyncAPI SDK lives outside the hexagon: asyncapi.provider (asyncapi.yml) and asyncapi.client (asyncapi-client.yml) -->
 		<asyncApiClientApiPackage>${basePackage}.asyncapi.client</asyncApiClientApiPackage>
 
@@ -185,6 +188,19 @@
 		</dependency>
 	</dependencies>
 
+	<repositories>
+		<repository>
+			<id>github</id>
+			<url>https://maven.pkg.github.com/arcadia-editions/arcadia-editions-architecture</url>
+		</repository>
+	</repositories>
+	<pluginRepositories>
+		<pluginRepository>
+			<id>github</id>
+			<url>https://maven.pkg.github.com/arcadia-editions/arcadia-editions-architecture</url>
+		</pluginRepository>
+	</pluginRepositories>
+
 	<build>
 		<plugins>
 			<plugin>
@@ -308,6 +324,13 @@
 				<groupId>org.openapitools</groupId>
 				<artifactId>openapi-generator-maven-plugin</artifactId>
 				<version>${openapi-generator-maven-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.arcadiaeditions.orders.checkout.orders-checkout</groupId>
+						<artifactId>service-all</artifactId>
+						<version>${orders-checkout-api.version}</version>
+					</dependency>
+				</dependencies>
 				<executions>
 					<execution>
 						<goals>
@@ -396,6 +419,16 @@
 						<groupId>io.zenwave360.sdk.plugins</groupId>
 						<artifactId>asyncapi-generator</artifactId>
 						<version>${zenwave.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>com.arcadiaeditions.orders.checkout.orders-checkout</groupId>
+						<artifactId>service-all</artifactId>
+						<version>${orders-checkout-api.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>com.arcadiaeditions.catalog.inventory-management.catalog-inventory</groupId>
+						<artifactId>service-all</artifactId>
+						<version>${catalog-inventory-api.version}</version>
 					</dependency>
 				</dependencies>
 			</plugin>

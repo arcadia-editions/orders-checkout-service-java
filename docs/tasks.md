@@ -10,6 +10,8 @@ payments, fulfillment, notifications) are boards of their own repositories; here
 Model paths: ZFL = ../arcadia-editions-architecture/business-flows/place-order-flow.zfl,
 ZDL = ../orders-checkout-api/domain-model.zdl, inventory ZDL = ../catalog-inventory-api/domain-model.zdl.
 Test data chains C-01..C-10: header of src/test/resources/data.sql.
+Approved models: orders-checkout-api service-all 0.2.0 (tag release/service-all/v0.2.0), catalog-inventory-api
+service-all 0.2.0 (consumed Avro); ZFL at arcadia-editions-architecture tag baseline/place-order-flow-<n>.
 -->
 
 ## S0 Baseline
