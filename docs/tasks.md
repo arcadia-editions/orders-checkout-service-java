@@ -105,11 +105,12 @@ review: [ ]
       tests: OrdersCheckoutServiceTest#cancelOrderTest
       blocked by: T-02, T-03
       done: claude-code claude-sonnet
-- [/] T-13 mechanical AFK StockReleasedConsumerService: map StockReleased (orderId, reason name) to CancelOrderInput and call cancelOrder
+- [x] T-13 mechanical AFK StockReleasedConsumerService: map StockReleased (orderId, reason name) to CancelOrderInput and call cancelOrder
       model: ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/domain-model.zdl:117-121, ../catalog-inventory-api/domain-model.zdl:74-80
       test data: data.sql (C-03)
       tests: StockReleasedConsumerServiceTest
       blocked by: T-12
+      done: grok grok-4.7
 - [ ] T-14 bounded AFK Flow test orderCancelled (orders side), one case per cause: PAYMENT_DECLINED, PAYMENT_RETRY_EXHAUSTED, RESERVATION_EXPIRED from CREATED; PAYMENT_VOIDED, PAYMENT_VOID_FAILED from CONFIRMED; GET shows CANCELLED with the reason
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:262-266, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-344
       test data: data.sql (C-03, C-04, C-06..C-10)
@@ -121,7 +122,7 @@ path: ... > PaymentAuthorized > confirmOrder[stock-not-held | order-cancelled] >
       > voidPayment > PaymentVoided > releaseStock > StockReleased > cancelOrder > end orderCancelled
 review: [ ]
 
-- [ ] T-15 bounded AFK confirmOrder rejected: on CANCELLED emit OrderConfirmationRejected ORDER_CANCELLED; on NOT_HELD emit it with STOCK_NOT_HELD; no state change (EventsMapper asOrderConfirmationRejected with reason and rejectedAt)
+- [/] T-15 bounded AFK confirmOrder rejected: on CANCELLED emit OrderConfirmationRejected ORDER_CANCELLED; on NOT_HELD emit it with STOCK_NOT_HELD; no state change (EventsMapper asOrderConfirmationRejected with reason and rejectedAt)
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:147-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:206-214, ../catalog-inventory-api/domain-model.zdl:115-125
       test data: data.sql (C-05 stock-not-held, C-06 order-cancelled)
       tests: OrdersCheckoutServiceTest#confirmOrderRejectedTest
