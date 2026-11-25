@@ -18,23 +18,21 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
     public void testStartOrderCheckout_201() {
         String requestBody = """
             {
-              "customerId" : "customerId-6i3m79xjb5uk5c",
-              "customerEmail" : "lindsay.kuhic@gmail.com",
-              "paymentMethodId" : "paymentMethodId-s3c",
-              "currency" : "currency-p47w3wk72mejl7yof",
+              "customerId" : "CUS-100",
+              "customerEmail" : "reader@example.com",
+              "paymentMethodId" : "PM-100",
+              "currency" : "EUR",
               "items" : [ {
-                "sku" : "sku-8t3cv0aw69q81xsr0otp5f",
-                "quantity" : 83,
-                "unitPrice" : 99
+                "sku" : "SKU-001",
+                "quantity" : 2,
+                "unitPrice" : 10.50
               } ],
               "shippingAddress" : {
-                "name" : "name-tnr7ehins",
-                "line1" : "line1-wim4ehii1ay202qc4ki0",
-                "line2" : "line2-ugbmqqk0yqur",
-                "city" : "Curtmouth",
-                "region" : "region-j3n3t",
-                "postalCode" : "postalCode-0ua5o9cw6aty376",
-                "country" : "Falkland Islands (Malvinas"
+                "name" : "Reader One",
+                "line1" : "1 Main St",
+                "city" : "Madrid",
+                "postalCode" : "28001",
+                "country" : "ES"
               }
             }
         """;
@@ -58,7 +56,7 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
                 .jsonPath("$.orderId")
                 .isNotEmpty()
                 .jsonPath("$.status")
-                .isNotEmpty()
+                .isEqualTo("CREATED")
                 .jsonPath("$.customerId")
                 .isNotEmpty()
                 .jsonPath("$.customerEmail")
@@ -81,27 +79,17 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
                 .isNotEmpty()
                 .jsonPath("$.shippingAddress.line1")
                 .isNotEmpty()
-                .jsonPath("$.shippingAddress.line2")
-                .isNotEmpty()
                 .jsonPath("$.shippingAddress.city")
-                .isNotEmpty()
-                .jsonPath("$.shippingAddress.region")
                 .isNotEmpty()
                 .jsonPath("$.shippingAddress.postalCode")
                 .isNotEmpty()
                 .jsonPath("$.shippingAddress.country")
                 .isNotEmpty()
                 .jsonPath("$.totalAmount")
-                .isNotEmpty()
+                .isEqualTo(21.0)
                 .jsonPath("$.currency")
-                .isNotEmpty()
+                .isEqualTo("EUR")
                 .jsonPath("$.createdAt")
-                .isNotEmpty()
-                .jsonPath("$.confirmedAt")
-                .isNotEmpty()
-                .jsonPath("$.cancelledAt")
-                .isNotEmpty()
-                .jsonPath("$.cancellationReason")
                 .isNotEmpty();
     }
 
