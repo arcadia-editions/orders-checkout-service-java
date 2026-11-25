@@ -8,17 +8,18 @@
 -- C-02 | ORD-002, SKU-002x2 + SKU-003x1 | CREATED (stock reserved, payment authorized) | confirmOrder confirmed (PaymentAuthorized); multiplicity (2 lines, total 99.97); getOrder CREATED
 -- C-03 | ORD-003, SKU-002x1 | CREATED (stock just released) | cancelOrder from CREATED (StockReleased PAYMENT_DECLINED / PAYMENT_RETRY_EXHAUSTED / RESERVATION_EXPIRED)
 -- C-04 | ORD-004, SKU-002x1 | CONFIRMED (fulfillment or capture failed, payment voided, stock released) | cancelOrder from CONFIRMED (StockReleased PAYMENT_VOIDED)
--- C-05 | ORD-005, SKU-002x1 | CREATED (stock released by the timer, late authorization) | confirmOrder stock-not-held (stub-driven: inventory answers NOT_HELD) -> blocked P-01
--- C-06 | ORD-006, SKU-002x1 | CANCELLED RESERVATION_EXPIRED (late authorization) | confirmOrder order-cancelled -> blocked P-01; cancelOrder redelivery no-op; outcome cancelled by expiry; getOrder CANCELLED
+-- C-05 | ORD-005, SKU-002x1 | CREATED (stock released by the timer, late authorization) | confirmOrder stock-not-held (stub-driven: inventory answers NOT_HELD -> OrderConfirmationRejected STOCK_NOT_HELD, P-01 A)
+-- C-06 | ORD-006, SKU-002x1 | CANCELLED RESERVATION_EXPIRED (late authorization) | confirmOrder order-cancelled (OrderConfirmationRejected ORDER_CANCELLED, P-01 A); cancelOrder redelivery no-op; outcome cancelled by expiry; getOrder CANCELLED
 -- C-07 | ORD-007, SKU-002x1 | CANCELLED PAYMENT_DECLINED | outcome cancelled by decline; cancelOrder redelivery
 -- C-08 | ORD-008, SKU-002x1 | CANCELLED PAYMENT_RETRY_EXHAUSTED | outcome cancelled by retries exhausted
 -- C-09 | ORD-009, SKU-002x1 | CANCELLED PAYMENT_VOIDED (was CONFIRMED) | outcome cancelled after fulfillment / capture failure
+-- C-10 | ORD-010, SKU-002x1 | CANCELLED PAYMENT_VOID_FAILED (was CONFIRMED) | outcome cancelled, void refused (P-02 A); getOrder shows the hold may still show
 --
 -- COVERAGE (need -> chain, or why no row)
 -- Lifecycle: confirmOrder from CREATED -> C-02; cancelOrder from CREATED -> C-03, from CONFIRMED -> C-04
 -- Branches: startOrderCheckout OrderCreated | StockUnavailable -> no row, stub-driven (inventory reserveStock decides; the order is persisted only on OrderCreated);
---   confirmOrder confirmed -> C-02; stock-not-held -> C-05 (stub-driven + blocked P-01); order-cancelled -> C-06 (blocked P-01)
--- Outcomes: completed -> C-01; cancelled by decline C-07, retries exhausted C-08, voided C-09, expiry C-06; void refused -> no row, blocked P-02;
+--   confirmOrder confirmed -> C-02; stock-not-held -> C-05 (stub-driven); order-cancelled -> C-06
+-- Outcomes: completed -> C-01; cancelled by decline C-07, retries exhausted C-08, voided C-09, expiry C-06; void refused C-10;
 --   stockGone -> no row (no order persisted); notificationFailed -> no row (notifications context)
 -- Multiplicity: items minlength(1) -> C-02 (2 lines)
 -- Time: the 10-minute reservation timer is owned by catalog-inventory (expireReservation); Order has no deadline field -> no row here
@@ -26,7 +27,7 @@
 -- Read side (GET /orders/{id}): CREATED -> C-02 (id 51), CONFIRMED -> C-01 (id 1), CANCELLED -> C-06 (id 251); not found -> any id not listed (e.g. 999)
 --
 -- ASSUMPTIONS: assumption | value used | open question
--- cancellation_reason holds the StockReleaseReason name from CancelOrderInput.reason | PAYMENT_DECLINED, ... | P-02 (PAYMENT_VOID_FAILED missing)
+-- cancellation_reason holds the StockReleaseReason name from CancelOrderInput.reason | PAYMENT_DECLINED, ... | P-02 A (PAYMENT_VOID_FAILED added)
 -- Prices accepted as sent by the client; totalAmount = sum(quantity * unitPrice) | 49.99 / 29.99 / 99.97 | -
 -- Stock-unavailable API tests drive the inventory stub, not a row (e.g. SKU-004 has zero stock in catalog-inventory fixtures) | SKU-004 | stub contract
 -- confirmedAt / cancelledAt are set by confirmOrder / cancelOrder; a CONFIRMED order cancelled later keeps confirmedAt (C-09) | as listed | -
@@ -78,3 +79,8 @@ VALUES (nextval('checkout_order_seq'), 0, 'ORD-009', 'CANCELLED', 'CUST-009', 'c
         '[{"sku":"SKU-002","quantity":1,"unitPrice":29.99}]'::jsonb,
         '{"name":"Arcadia Customer 9","line1":"9 Book Lane","line2":null,"city":"Madrid","region":null,"postalCode":"28009","country":"ES"}'::jsonb,
         29.99, 'EUR', '2026-10-14T09:50:09Z', '2026-10-14T09:50:39Z', '2026-10-14T09:51:39Z', 'PAYMENT_VOIDED'); -- C-09
+INSERT INTO checkout_order (id, version, order_id, status, customer_id, customer_email, payment_method_id, items, shipping_address, total_amount, currency, created_at, confirmed_at, cancelled_at, cancellation_reason)
+VALUES (nextval('checkout_order_seq'), 0, 'ORD-010', 'CANCELLED', 'CUST-010', 'customer010@example.com', 'PM-010',
+        '[{"sku":"SKU-002","quantity":1,"unitPrice":29.99}]'::jsonb,
+        '{"name":"Arcadia Customer 10","line1":"10 Book Lane","line2":null,"city":"Madrid","region":null,"postalCode":"28010","country":"ES"}'::jsonb,
+        29.99, 'EUR', '2026-10-14T09:50:10Z', '2026-10-14T09:50:40Z', '2026-10-14T09:51:40Z', 'PAYMENT_VOID_FAILED'); -- C-10
