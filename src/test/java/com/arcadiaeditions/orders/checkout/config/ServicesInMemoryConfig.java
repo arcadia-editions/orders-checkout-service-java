@@ -4,10 +4,12 @@ import com.arcadiaeditions.orders.checkout.asyncapi.provider.*;
 import com.arcadiaeditions.orders.checkout.core.application.*;
 import com.arcadiaeditions.orders.checkout.core.domain.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.*;
+import com.arcadiaeditions.orders.checkout.infrastructure.inventory.InventoryClientStub;
 import java.time.Clock;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
 /**
@@ -21,12 +23,20 @@ public class ServicesInMemoryConfig extends RepositoriesInMemoryConfig {
 
     protected final Clock clock = TestClock.FIXED;
 
+    protected final InventoryClientStub inventoryClient = new InventoryClientStub(clock);
+
     protected final OrdersCheckoutServiceImpl ordersCheckoutService = new OrdersCheckoutServiceImpl(
             orderRepository(), eventsProducerInMemoryContext.ordersCheckoutEventsProducer(), clock);
 
     @Bean
     public <T extends OrdersCheckoutService> T ordersCheckoutService() {
         return (T) ordersCheckoutService;
+    }
+
+    @Bean
+    @Primary
+    public InventoryClientStub inventoryClient() {
+        return inventoryClient;
     }
 
     static List<Order> _orders;
