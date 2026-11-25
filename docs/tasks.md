@@ -17,7 +17,7 @@ service-all 0.2.0 (consumed Avro); ZFL at arcadia-editions-architecture tag base
 ## S0 Baseline
 review: [ ]
 
-- [ ] T-01 mechanical AFK Generated tests that should pass do: getOrderTest with a fixture id, updateTest without Instant.now()/OrderItem equality, API tests with a datasource
+- [/] T-01 mechanical AFK Generated tests that should pass do: getOrderTest with a fixture id, updateTest without Instant.now()/OrderItem equality, API tests with a datasource
       test data: data/jpa/Order/1.json, data.sql (C-01, id 1)
       tests: OrdersCheckoutServiceTest, OrderRepositoryIntegrationTest, OrdersCheckoutApiControllerTest#getOrderTest, OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_400
 - [ ] T-02 mechanical AFK Inject a java.time.Clock (system clock in main, fixed 2026-10-14T10:00:00Z in tests) for every timestamp the service sets
@@ -26,8 +26,9 @@ review: [ ]
       model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:113-121
       test data: data.sql (C-02, C-06)
       tests: OrderRepositoryIntegrationTest
-- [ ] T-04 bounded HITL Decide how orderId is generated (format, who generates it) and record it as an ADR; ZDL and ZFL do not say
+- [x] T-04 bounded HITL Decide how orderId is generated (format, who generates it) and record it as an ADR; ZDL and ZFL do not say
       model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:92-111
+      done: person (HITL), docs/adr/0001-order-id.md
 - [ ] T-05 advanced AFK Outbound port InventoryClient (reserveStock, confirmStockReservation) with its REST adapter on catalog-inventory /inventory/reservations/{reserve,confirm}, and an in-memory stub for tests (SKU-004 unavailable, NOT_HELD by orderId)
       model: ../orders-checkout-api/domain-model.zdl:129, ../orders-checkout-api/domain-model.zdl:138, ../catalog-inventory-api/domain-model.zdl:115-145, ../catalog-inventory-api/domain-model.zdl:169-171, ../catalog-inventory-api/domain-model.zdl:192-194, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:101-105, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:171-176
       tests: InventoryClientStubTest
