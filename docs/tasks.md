@@ -83,10 +83,11 @@ review: [ ]
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:113, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155, ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
       fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (FIX FIRST)
       tests: PlaceOrderFlowKafkaIntegrationTest
-- [/] T-21 bounded AFK S1 review fixes: recording InventoryClientStub and asserts that startOrderCheckout reserved the persisted orderId with the requested sku/quantity lines; OrderConfirmed.version after the confirm write (assert in PlaceOrderFlowCompletedIntegrationTest, emit after flush if stale); TestClock.NOW in OrdersCheckoutApiControllerTest
+- [x] T-21 bounded AFK S1 review fixes: recording InventoryClientStub and asserts that startOrderCheckout reserved the persisted orderId with the requested sku/quantity lines; OrderConfirmed.version after the confirm write (assert in PlaceOrderFlowCompletedIntegrationTest, emit after flush if stale); TestClock.NOW in OrdersCheckoutApiControllerTest
       fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (SHOULD FIX, NOTEs)
       tests: OrdersCheckoutServiceTest, OrdersCheckoutApiControllerTest, PlaceOrderFlowCompletedIntegrationTest
       blocked by: T-10
+      done: claude-code claude-sonnet
 
 ## S2 stockGone
 path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableResult] > StockUnavailable
@@ -148,7 +149,7 @@ review: [ ]
 ## S5 polish
 review: [ ]
 
-- [ ] T-17 mechanical AFK getOrder read side: 200 for CREATED (C-02), CONFIRMED (C-01), CANCELLED (C-06) and 404 for an unknown id
+- [/] T-17 mechanical AFK getOrder read side: 200 for CREATED (C-02), CONFIRMED (C-01), CANCELLED (C-06) and 404 for an unknown id
       model: ../orders-checkout-api/domain-model.zdl:146-147
       test data: data.sql (C-01, C-02, C-06)
       tests: OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testGetOrder_400, OrdersCheckoutApiControllerTest#getOrderTest
