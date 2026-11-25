@@ -53,11 +53,6 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
         this.orderIdGenerator = orderIdGenerator;
     }
 
-    /** Clock used for createdAt, confirmedAt, cancelledAt and event timestamps such as rejectedAt. */
-    Clock clock() {
-        return clock;
-    }
-
     public Order startOrderCheckout(StartOrderCheckoutInput input) {
 
         log.debug("Request startOrderCheckout: {}", input);
