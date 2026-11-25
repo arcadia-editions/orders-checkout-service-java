@@ -19,7 +19,7 @@ public class PaymentAuthorizedConsumerService implements IPaymentAuthorizedEvent
     }
 
     @Override
-    public void onPaymentAuthorizedEvent(PaymentAuthorized payload, PaymentAuthorizedHeaders headers) {
+    public void onPaymentAuthorizedEventV1(PaymentAuthorized payload, PaymentAuthorizedHeaders headers) {
         // TODO CUSTOM_REQUIRED: map payload to ConfirmOrderInput and call ordersCheckoutService.confirmOrder
         throw new UnsupportedOperationException("Not implemented");
     }

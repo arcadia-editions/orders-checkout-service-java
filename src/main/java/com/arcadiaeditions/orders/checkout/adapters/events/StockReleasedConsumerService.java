@@ -19,7 +19,7 @@ public class StockReleasedConsumerService implements IStockReleasedEventV1Consum
     }
 
     @Override
-    public void onStockReleasedEvent(StockReleased payload, StockReleasedHeaders headers) {
+    public void onStockReleasedEventV1(StockReleased payload, StockReleasedHeaders headers) {
         // TODO CUSTOM_REQUIRED: map payload to CancelOrderInput (orderId, reason) and call ordersCheckoutService.cancelOrder
         throw new UnsupportedOperationException("Not implemented");
     }
