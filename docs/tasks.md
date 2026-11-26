@@ -79,15 +79,22 @@ review: [ ]
       blocked by: T-06, T-08
       done: claude-code claude-sonnet
 
-- [/] T-20 advanced AFK Kafka wiring of the slice: application.yml spring.cloud.stream bindings for the consumers payment-authorized-event-v1 and stock-released-event-v1 (in-0, group orders-checkout) and destinations of every *-out binding as asyncapi.yml / asyncapi-client.yml name the topics, Avro content type and Schema Registry; one Kafka Testcontainers test (docker-compose) that publishes PaymentAuthorized to its topic and consumes OrderCreated and OrderConfirmed from theirs, without the in-memory producer
+- [x] T-20 advanced AFK Kafka wiring of the slice: application.yml spring.cloud.stream bindings for the consumers payment-authorized-event-v1 and stock-released-event-v1 (in-0, group orders-checkout) and destinations of every *-out binding as asyncapi.yml / asyncapi-client.yml name the topics, Avro content type and Schema Registry; one Kafka Testcontainers test (docker-compose) that publishes PaymentAuthorized to its topic and consumes OrderCreated and OrderConfirmed from theirs, without the in-memory producer
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:113, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155, ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
       fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (FIX FIRST)
       tests: PlaceOrderFlowKafkaIntegrationTest
+      done: claude-code claude-opus
 - [x] T-21 bounded AFK S1 review fixes: recording InventoryClientStub and asserts that startOrderCheckout reserved the persisted orderId with the requested sku/quantity lines; OrderConfirmed.version after the confirm write (assert in PlaceOrderFlowCompletedIntegrationTest, emit after flush if stale); TestClock.NOW in OrdersCheckoutApiControllerTest
       fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (SHOULD FIX, NOTEs)
       tests: OrdersCheckoutServiceTest, OrdersCheckoutApiControllerTest, PlaceOrderFlowCompletedIntegrationTest
       blocked by: T-10
       done: claude-code claude-sonnet
+
+- [!] T-23 advanced HITL Confluent wire format for Avro: KafkaAvroSerializer/Deserializer (native encoding/decoding, TopicNameStrategy subjects) instead of Spring Cloud Stream's Avro converter, so payments and inventory (Confluent serde) can read and write the same messages; needs io.confluent:kafka-avro-serializer and the Confluent Maven repository in pom.xml
+      model: ../api-contract-commons/asyncapi-master.yml (confluentSchemaRegistry), ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
+      fixes: .zenwave/handoff/place-order-flow/reports/T-20.md (CHOICES)
+      tests: PlaceOrderFlowKafkaIntegrationTest
+      blocked: person decision (pom.xml dependency)
 
 ## S2 stockGone
 path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableResult] > StockUnavailable
