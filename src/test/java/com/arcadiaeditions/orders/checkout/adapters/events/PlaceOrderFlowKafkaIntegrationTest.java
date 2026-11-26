@@ -1,0 +1,246 @@
+package com.arcadiaeditions.orders.checkout.adapters.events;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
+
+import com.arcadiaeditions.orders.checkout.asyncapi.provider.OrdersCheckoutEventsProducer;
+import com.arcadiaeditions.orders.checkout.config.DockerComposeInitializer;
+import com.arcadiaeditions.orders.checkout.core.outbound.jpa.OrderRepository;
+import com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmed;
+import com.arcadiaeditions.orders.checkout.events.avro.OrderCreated;
+import com.arcadiaeditions.payments.processing.events.avro.PaymentAuthorized;
+import com.jayway.jsonpath.JsonPath;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cloud.stream.schema.registry.avro.AvroSchemaRegistryClientMessageConverter;
+import org.springframework.http.MediaType;
+import org.springframework.messaging.MessageHeaders;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.client.MockMvcWebTestClient;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * place-order-flow over Kafka (ZFL 113, 155; ZDL 136): start-checkout publishes OrderCreated to its topic,
+ * PaymentAuthorized on the payments topic reaches confirmOrder through the payment-authorized-event-v1 binding, and
+ * OrderConfirmed lands on its topic. Real producer (StreamBridge), Avro payloads through the compose Schema Registry.
+ * Not transactional: the binder thread must see the committed order.
+ */
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.MOCK,
+        properties = {
+            "arcadia.test.events-producer=kafka",
+            "spring.cloud.stream.bindings.payment-authorized-event-v1-in-0.consumer.auto-startup=true"
+        })
+@ActiveProfiles("test")
+@DockerComposeInitializer.EnableDockerCompose
+class PlaceOrderFlowKafkaIntegrationTest {
+
+    static final String ORDER_CREATED_TOPIC = "orders-checkout.order-created.event.avro.v1";
+    static final String ORDER_CONFIRMED_TOPIC = "orders-checkout.order-confirmed.event.avro.v1";
+    static final String PAYMENT_AUTHORIZED_TOPIC = "payments-processing.payment-authorized.event.avro.v1";
+    static final Duration TIMEOUT = Duration.ofSeconds(30);
+
+    @Autowired
+    WebApplicationContext context;
+
+    @Autowired
+    OrdersCheckoutEventsProducer eventsProducer;
+
+    @Autowired
+    AvroSchemaRegistryClientMessageConverter avroConverter;
+
+    @Autowired
+    OrderRepository orderRepository;
+
+    @Value("${spring.kafka.bootstrap-servers}")
+    String bootstrapServers;
+
+    @Value("${spring.cloud.stream.schema-registry-client.endpoint}")
+    String schemaRegistryUrl;
+
+    WebTestClient webTestClient;
+    KafkaConsumer<String, byte[]> consumer;
+    final List<ConsumerRecord<String, byte[]>> received = new ArrayList<>();
+    String orderId;
+
+    @BeforeEach
+    void setup() {
+        webTestClient = MockMvcWebTestClient.bindToApplicationContext(context).build();
+        var props = new Properties();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "place-order-flow-kafka-it-" + UUID.randomUUID());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
+        consumer = new KafkaConsumer<>(props);
+        consumer.subscribe(List.of(ORDER_CREATED_TOPIC, ORDER_CONFIRMED_TOPIC));
+    }
+
+    @AfterEach
+    void cleanup() {
+        consumer.close();
+        if (orderId != null) {
+            orderRepository.findByOrderId(orderId).ifPresent(orderRepository::delete);
+        }
+    }
+
+    @Test
+    void startCheckoutThenPaymentAuthorizedOnKafkaConfirmsTheOrder() {
+        assertTrue(
+                !eventsProducer.getClass().getSimpleName().startsWith("InMemory"),
+                "the real producer must be wired, not " + eventsProducer.getClass());
+
+        String requestBody = """
+            {
+              "customerId" : "CUS-100",
+              "customerEmail" : "reader@example.com",
+              "paymentMethodId" : "PM-100",
+              "currency" : "EUR",
+              "items" : [ { "sku" : "SKU-001", "quantity" : 2, "unitPrice" : 10.50 } ],
+              "shippingAddress" : {
+                "name" : "Reader One", "line1" : "1 Main St", "city" : "Madrid",
+                "postalCode" : "28001", "country" : "ES"
+              }
+            }
+        """;
+        long startedAt = System.currentTimeMillis();
+        var body = webTestClient
+                .method(POST)
+                .uri("/api/orders/start-checkout")
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(requestBody)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(201)
+                .expectBody()
+                .returnResult()
+                .getResponseBody();
+        var json = new String(body, StandardCharsets.UTF_8);
+        orderId = JsonPath.read(json, "$.orderId");
+        long id = ((Number) JsonPath.read(json, "$.id")).longValue();
+
+        // OrderCreated on orders-checkout.order-created.event.avro.v1
+        var created = awaitOne(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt);
+        assertEquals(orderId, created.getOrderId().toString());
+        assertEquals(Double.valueOf(21.0), created.getAmount());
+
+        // PaymentAuthorized on payments-processing.payment-authorized.event.avro.v1, as payments would publish it
+        var payment = new PaymentAuthorized();
+        payment.setOrderId(orderId);
+        payment.setCustomerId("CUS-100");
+        payment.setAmount(21.0);
+        payment.setCurrency("EUR");
+        publish(PAYMENT_AUTHORIZED_TOPIC, orderId, payment);
+
+        // OrderConfirmed on orders-checkout.order-confirmed.event.avro.v1
+        var confirmed = awaitOne(ORDER_CONFIRMED_TOPIC, OrderConfirmed.class, startedAt);
+        assertEquals(orderId, confirmed.getOrderId().toString());
+        assertEquals(
+                1,
+                recordsFor(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt).size());
+
+        // both schemas were registered in the compose Schema Registry
+        String subjects = RestClient.create(schemaRegistryUrl)
+                .get()
+                .uri("/subjects")
+                .retrieve()
+                .body(String.class);
+        assertTrue(subjects.contains("ordercreated"), subjects);
+        assertTrue(subjects.contains("orderconfirmed"), subjects);
+
+        webTestClient
+                .method(GET)
+                .uri("/api/orders/{id}", id)
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(200)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo("CONFIRMED");
+    }
+
+    private void publish(String topic, String key, Object payload) {
+        var avro = avroConverter.toMessage(
+                payload, new MessageHeaders(Map.of(MessageHeaders.CONTENT_TYPE, "application/*+avro")));
+        String contentType = String.valueOf(avro.getHeaders().get(MessageHeaders.CONTENT_TYPE));
+        var props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+        try (var producer = new KafkaProducer<String, byte[]>(props)) {
+            var record = new ProducerRecord<>(topic, key, (byte[]) avro.getPayload());
+            record.headers().add(MessageHeaders.CONTENT_TYPE, contentType.getBytes(StandardCharsets.UTF_8));
+            producer.send(record).get();
+        } catch (Exception e) {
+            throw new IllegalStateException("could not publish to " + topic, e);
+        }
+    }
+
+    private <T> T awaitOne(String topic, Class<T> type, long since) {
+        Awaitility.await().atMost(TIMEOUT).until(() -> {
+            consumer.poll(Duration.ofMillis(500)).forEach(received::add);
+            return !recordsFor(topic, type, since).isEmpty();
+        });
+        return recordsFor(topic, type, since).getFirst();
+    }
+
+    private <T> List<T> recordsFor(String topic, Class<T> type, long since) {
+        return received.stream()
+                .filter(r -> r.topic().equals(topic) && r.timestamp() >= since)
+                .map(r -> decode(r, type))
+                .filter(e -> orderId.equals(orderIdOf(e)))
+                .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T decode(ConsumerRecord<String, byte[]> record, Class<T> type) {
+        Header header = record.headers().lastHeader(MessageHeaders.CONTENT_TYPE);
+        String contentType = header == null
+                ? "application/*+avro"
+                : new String(header.value(), StandardCharsets.UTF_8).replace("\"", "");
+        var message = MessageBuilder.withPayload(record.value())
+                .setHeader(MessageHeaders.CONTENT_TYPE, contentType)
+                .build();
+        return (T) avroConverter.fromMessage(message, type);
+    }
+
+    private static String orderIdOf(Object event) {
+        if (event instanceof OrderCreated e) {
+            return e.getOrderId().toString();
+        }
+        if (event instanceof OrderConfirmed e) {
+            return e.getOrderId().toString();
+        }
+        return null;
+    }
+}
