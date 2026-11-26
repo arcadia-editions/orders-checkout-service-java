@@ -122,7 +122,7 @@ review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/r
 path: ... > PaymentDeclined | PaymentRetryExhausted | PaymentVoided | PaymentVoidFailed | ReservationExpired
       > releaseStock / expireReservation > StockReleased > cancelOrder > OrderCancelled
       > sendOrderCancelledNotification > end orderCancelled
-review: [ ]
+review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S3-final.md
 
 - [x] T-12 bounded AFK cancelOrder: load by orderId, CREATED or CONFIRMED to CANCELLED, cancellationReason = input.reason, cancelledAt, persist, emit OrderCancelled; no-op, no event, on CANCELLED
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:300-310, ../orders-checkout-api/domain-model.zdl:117-121, ../orders-checkout-api/domain-model.zdl:141-144, ../orders-checkout-api/domain-model.zdl:195-205
@@ -173,3 +173,8 @@ review: [ ]
 - [/] T-24 mechanical AFK LoggingAspectConfiguration does not log StockUnavailableException (business 409 of stockGone) at ERROR; log it at DEBUG or skip it, other exceptions unchanged
       fixes: .zenwave/handoff/place-order-flow/reports/review-S2-final.md (STANDARDS NOTE)
       tests: LoggingAspectConfigurationTest
+- [ ] T-25 bounded AFK Event version is the persisted one: startOrderCheckout, confirmOrder and cancelOrder map their event after the write is flushed (saveAndFlush); PlaceOrderFlowCancelledIntegrationTest flushes and clears before the final GET and asserts OrderCancelled.version == persisted version, customerId and customerEmail; remove dead OrdersCheckoutServiceMapper asOrder/update for CancelOrderInput and ConfirmOrderInput
+      model: ../orders-checkout-api/domain-model.zdl:150-205
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S3-final.md (SHOULD FIX x2, NOTEs)
+      tests: OrdersCheckoutServiceTest, PlaceOrderFlowCancelledIntegrationTest, PlaceOrderFlowCompletedIntegrationTest
+      blocked by: T-24
