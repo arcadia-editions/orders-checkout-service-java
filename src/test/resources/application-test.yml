@@ -9,3 +9,9 @@ DATASOURCE_URL: jdbc:postgresql://localhost:5432/app
 DATASOURCE_USERNAME: postgres
 DATASOURCE_PASSWORD: admin123
 KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+SCHEMA_REGISTRY_URL: http://localhost:8081
+
+# Kafka consumers bound but not started in tests: every cached test context shares the topics and the group, and
+# would steal the records of PlaceOrderFlowKafkaIntegrationTest (which starts payment-authorized-event-v1-in-0).
+spring.cloud.stream.bindings.payment-authorized-event-v1-in-0.consumer.auto-startup: false
+spring.cloud.stream.bindings.stock-released-event-v1-in-0.consumer.auto-startup: false
