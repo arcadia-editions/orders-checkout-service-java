@@ -1,0 +1,24 @@
+VERDICT: FIX (blocked on the environment, not on code: integration tests never ran; static review found no FIX FIRST)
+SLICE: S2   RANGE: a359f97..bc0079c
+SUITE: cd .zenwave/work/review-S2 && mvn -q verify -Dmaven.test.failure.ignore=true, 3 attempts, all spoiled the same way
+  - Surefire: 32/32 green, incl. OrdersCheckoutServiceTest#startOrderCheckoutStockUnavailableTest, ArchitectureTest (both rules), OrdersCheckoutApiControllerTest.
+  - Failsafe: 13/13 ERROR, all "Failed to load ApplicationContext" <- Testcontainers compose "Bind for 0.0.0.0:2181 failed: port is already allocated".
+    Ports were free when each attempt started (attempt 3 only after 30 s free). Another job's compose took them during the compile and unit-test window:
+    attempt 1 project dvjqsdfba5hm (owner not captured), attempt 2 payments-processing-service-java/.zenwave/work/T-04, attempt 3 orders-checkout-service-java/.zenwave/work/T-20.
+    This is not a code result and not flakiness. PlaceOrderFlowStockGoneIntegrationTest, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_409 and the expected-red testGetOrder_400 are all UNVERIFIED.
+  - Settle it by rerunning the suite (or only `mvn -q verify -Dsurefire.skip=true`) while no other Docker job holds 5432/9092/8081/2181: the orchestrator should run Docker jobs one at a time. PASS if the only red is testGetOrder_400.
+BASELINE: untouched (no *.zfl, *.zdl, *openapi*.yml, *asyncapi*.yml or src/test/resources/data* changes in range)
+
+MODEL AXIS
+- NOTE  T-10 OrdersCheckoutServiceImpl.java:66-76  Point to weigh, emit then throw: confirmed by reading. Nothing is written before the throw (no save/flush; orderId comes from the in-process UUIDv7 generator, no DB sequence). So the rollback of the class-level @Transactional has nothing to undo, also on JPA. The producer is DefaultOrdersCheckoutEventsProducer -> StreamBridge.send, and no Kafka transactions are configured (no transaction-id-prefix in application.yml). So the send is not tied to the DB transaction: it goes out once and the rollback does not revoke it. Exactly one StockUnavailable per call: proven in memory (OrdersCheckoutServiceTest:378-379: 0 OrderCreated, 1 StockUnavailable). On JPA/web it is UNCONFIRMED until PlaceOrderFlowStockGoneIntegrationTest runs (it asserts 1 by orderId, no Order row, no OrderCreated). Matches ZFL 88-92 "on StockUnavailableResult emits StockUnavailable" and ZDL 126 "persists nothing".
+- NOTE  T-10 OrdersCheckoutServiceImpl.java:68  The boolean that onStockUnavailable returns is ignored, the same way onOrderCreated:88 ignores its own. If the send throws, the client gets 500, not 409. That is acceptable: there is nothing to keep consistent. Just stating it.
+- NOTE  T-10 WebExceptionsTranslator.java:27-40  The 409 body matches openapi-overlay.yml StockUnavailable (orderId, unavailableItems[sku, requestedQuantity, availableQuantity]), application/json. EventsMapper.java:29-37 fills orderId, customerId, customerEmail and unavailableItems from the reserveStock result, as ZDL 162-172 lists them. Nothing out of scope.
+- NOTE  T-11 PlaceOrderFlowStockGoneIntegrationTest.java:243-299  It proves the orders-side stockGone outcome (409 + body, no row by orderId and count unchanged, one StockUnavailable with the right lines, no OrderCreated). BaseWebTestClientTest is @Transactional, so the service joins the test transaction. "No row" is therefore read in the same transaction, which is still valid (auto-flush would show any write). It does not exercise a real commit or rollback, which does not matter here since nothing is written. Not run (see SUITE). The rest of the path (sendStockUnavailableNotification, end stockGone) belongs to the notifications context. The Kafka binding of stock-unavailable-out is T-20.
+
+STANDARDS AXIS
+- NOTE  EventsMapper.java:27  The generated `asStockUnavailable(Order)` is now dead. Order has no unavailableItems, so it can only build an event without items. This is a generated-once file and ours, so remove it to avoid a wrong call later.
+- NOTE  PlaceOrderFlowStockGoneIntegrationTest.java:294-298  It checks for no OrderCreated with `payload.toString().contains(orderId)`. unavailableFor (same file, :301-306) and PlaceOrderFlowCompletedIntegrationTest.createdFor (:97-102) filter on the typed getOrderId(). Use the same typed filter.
+- (checked, no finding) StockUnavailableException in core.inbound with its own Line record keeps outbound types out of the inbound port (ArchitectureTest green). The handler follows WebExceptionsTranslator's existing style. The OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_409 request now uses SKU-004 fixture values (generated-once test, ours).
+
+PROPOSALS: none
+NOT CHECKED: all integration tests (port contention, see SUITE). spotless:check not run (not bound to verify; I avoided a second Maven run on the same target).
