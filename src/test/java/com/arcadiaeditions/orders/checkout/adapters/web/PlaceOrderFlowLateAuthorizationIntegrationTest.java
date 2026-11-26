@@ -48,7 +48,8 @@ class PlaceOrderFlowLateAuthorizationIntegrationTest extends BaseWebTestClientTe
 
         var rejected = rejectedFor("ORD-005");
         assertEquals(rejectedBefore + 1, rejected.size());
-        var event = (OrderConfirmationRejected) rejected.get(rejected.size() - 1).getPayload();
+        var event =
+                (OrderConfirmationRejected) rejected.get(rejected.size() - 1).getPayload();
         assertEquals("STOCK_NOT_HELD", event.getReason().toString());
         assertEquals(confirmedBefore, confirmedFor("ORD-005").size());
         assertEquals(List.of("ORD-005"), inventory.confirmStockReservationCalls());
@@ -78,7 +79,8 @@ class PlaceOrderFlowLateAuthorizationIntegrationTest extends BaseWebTestClientTe
 
         var rejected = rejectedFor("ORD-006");
         assertEquals(rejectedBefore + 1, rejected.size());
-        var event = (OrderConfirmationRejected) rejected.get(rejected.size() - 1).getPayload();
+        var event =
+                (OrderConfirmationRejected) rejected.get(rejected.size() - 1).getPayload();
         assertEquals("ORDER_CANCELLED", event.getReason().toString());
         assertEquals(confirmedBefore, confirmedFor("ORD-006").size());
         assertFalse(inventory.confirmStockReservationCalls().contains("ORD-006"));
@@ -109,8 +111,9 @@ class PlaceOrderFlowLateAuthorizationIntegrationTest extends BaseWebTestClientTe
 
     private List<Message> rejectedFor(String orderId) {
         return events.getOnOrderConfirmationRejectedCapturedMessages().stream()
-                .filter(m -> orderId.equals(
-                        ((OrderConfirmationRejected) m.getPayload()).getOrderId().toString()))
+                .filter(m -> orderId.equals(((OrderConfirmationRejected) m.getPayload())
+                        .getOrderId()
+                        .toString()))
                 .toList();
     }
 

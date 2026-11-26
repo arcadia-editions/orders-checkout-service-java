@@ -133,11 +133,11 @@ public class InMemoryJpaRepository<T> implements JpaRepository<T, Long> {
     public void flush() {}
 
     public <S extends T> S saveAndFlush(S entity) {
-        return null;
+        return save(entity);
     }
 
     public <S extends T> List<S> saveAllAndFlush(Iterable<S> entities) {
-        return null;
+        return saveAll(entities);
     }
 
     public Optional<T> findById(Long id) {
