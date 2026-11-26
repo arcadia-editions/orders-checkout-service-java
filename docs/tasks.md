@@ -196,11 +196,12 @@ review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S6-fin
 ## S7 person requests (after S6)
 review: [ ]
 
-- [/] T-23 advanced AFK Confluent wire format for Avro: KafkaAvroSerializer/Deserializer (native encoding/decoding, TopicNameStrategy subjects) instead of Spring Cloud Stream's Avro converter, so payments and inventory (Confluent serde) can read and write the same messages; needs io.confluent:kafka-avro-serializer and the Confluent Maven repository in pom.xml
+- [x] T-23 advanced AFK Confluent wire format for Avro: KafkaAvroSerializer/Deserializer (native encoding/decoding, TopicNameStrategy subjects) instead of Spring Cloud Stream's Avro converter, so payments and inventory (Confluent serde) can read and write the same messages; needs io.confluent:kafka-avro-serializer and the Confluent Maven repository in pom.xml
       model: ../api-contract-commons/asyncapi-master.yml (confluentSchemaRegistry), ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
       fixes: .zenwave/handoff/place-order-flow/reports/T-20.md (CHOICES)
       tests: PlaceOrderFlowKafkaIntegrationTest
       decided: person 2026-11-26, Confluent serde, pom.xml dependency + repository allowed (ADR 0002)
+      done: claude-code claude-opus
 
 - [ ] T-29 advanced AFK Generated catalog-inventory HTTP client: second openapi-generator-maven-plugin execution (spring, library spring-http-interface, interfaces only) from catalog-inventory-api service-all 0.2.0 openapi.yml, reserveStock and confirmStockReservation only, into ${basePackage}.clients.inventory; CatalogInventoryClientConfiguration builds it with HttpServiceProxyFactory over a RestClient; InventoryClientRestAdapter implements InventoryClient with the generated interface and maps DTOs (MapStruct); the hand-written request/response classes go away; behavior unchanged (same port, same results, same tests)
       model: ../catalog-inventory-api/openapi.yml, ../catalog-inventory-api/domain-model.zdl:115-145, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:101-105, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:171-176, docs/backlog/http-clients.md
