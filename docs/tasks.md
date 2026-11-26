@@ -154,8 +154,9 @@ review: [ ]
 ## S5 polish
 review: [ ]
 
-- [/] T-17 mechanical AFK getOrder read side: 200 for CREATED (C-02), CONFIRMED (C-01), CANCELLED (C-06) and 404 for an unknown id
+- [x] T-17 mechanical AFK getOrder read side: 200 for CREATED (C-02), CONFIRMED (C-01), CANCELLED (C-06) and 404 for an unknown id
       model: ../orders-checkout-api/domain-model.zdl:146-147
       test data: data.sql (C-01, C-02, C-06)
       tests: OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testGetOrder_400, OrdersCheckoutApiControllerTest#getOrderTest
       blocked by: T-01
+      done: grok grok-4.7
