@@ -20,6 +20,8 @@ import com.arcadiaeditions.orders.checkout.events.avro.OrderCreated;
 import com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable;
 import com.arcadiaeditions.payments.processing.events.avro.PaymentAuthorized;
 import com.jayway.jsonpath.JsonPath;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -33,9 +35,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.awaitility.Awaitility;
@@ -45,10 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.cloud.stream.schema.registry.avro.AvroSchemaRegistryClientMessageConverter;
 import org.springframework.http.MediaType;
-import org.springframework.messaging.MessageHeaders;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.test.web.servlet.client.MockMvcWebTestClient;
@@ -61,8 +58,9 @@ import org.springframework.web.context.WebApplicationContext;
  * 306-308; ZDL 142): StockReleased reaches cancelOrder through stock-released-event-v1-in-0 (started here, same as
  * the payment binding) and OrderCancelled lands on its topic. S2 (ZFL 92): start-checkout with SKU-004 publishes
  * StockUnavailable. S4 (ZFL 162-163): PaymentAuthorized for a cancelled order publishes OrderConfirmationRejected.
- * Real producer (StreamBridge), Avro payloads through the compose Schema Registry. Not transactional: the binder
- * thread must see the committed order.
+ * Real producer (StreamBridge). Confluent wire format (ADR 0002): the test writes with KafkaAvroSerializer and reads
+ * with KafkaAvroDeserializer against the compose Schema Registry, subjects {@code <topic>-value}. Not transactional:
+ * the binder thread must see the committed order.
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -91,19 +89,17 @@ class PlaceOrderFlowKafkaIntegrationTest {
     OrdersCheckoutEventsProducer eventsProducer;
 
     @Autowired
-    AvroSchemaRegistryClientMessageConverter avroConverter;
-
-    @Autowired
     OrderRepository orderRepository;
 
     @Value("${spring.kafka.bootstrap-servers}")
     String bootstrapServers;
 
-    @Value("${spring.cloud.stream.schema-registry-client.endpoint}")
+    @Value("${SCHEMA_REGISTRY_URL}")
     String schemaRegistryUrl;
 
     WebTestClient webTestClient;
     KafkaConsumer<String, byte[]> consumer;
+    KafkaAvroDeserializer avroDeserializer;
     final List<ConsumerRecord<String, byte[]>> received = new ArrayList<>();
     /** Filters Kafka records. Also set for fixture ORD-006, which cleanup must not delete. */
     String orderId;
@@ -123,6 +119,8 @@ class PlaceOrderFlowKafkaIntegrationTest {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         consumer = new KafkaConsumer<>(props);
+        avroDeserializer = new KafkaAvroDeserializer();
+        avroDeserializer.configure(serdeConfig(), false);
         consumer.subscribe(List.of(
                 ORDER_CREATED_TOPIC,
                 ORDER_CONFIRMED_TOPIC,
@@ -134,6 +132,7 @@ class PlaceOrderFlowKafkaIntegrationTest {
     @AfterEach
     void cleanup() {
         consumer.close();
+        avroDeserializer.close();
         if (createdOrderId != null) {
             orderRepository.findByOrderId(createdOrderId).ifPresent(orderRepository::delete);
         }
@@ -180,6 +179,10 @@ class PlaceOrderFlowKafkaIntegrationTest {
         var created = awaitOne(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt);
         assertEquals(orderId, created.getOrderId().toString());
         assertEquals(Double.valueOf(21.0), created.getAmount());
+        // Confluent wire format: magic byte 0, then the 4-byte schema id
+        var createdRecord = rawRecordsFor(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt)
+                .getFirst();
+        assertEquals(0, createdRecord.value()[0], "magic byte");
 
         // PaymentAuthorized on payments-processing.payment-authorized.event.avro.v1, as payments would publish it
         var payment = new PaymentAuthorized();
@@ -212,8 +215,9 @@ class PlaceOrderFlowKafkaIntegrationTest {
                 .uri("/subjects")
                 .retrieve()
                 .body(String.class);
-        assertTrue(subjects.contains("ordercreated"), subjects);
-        assertTrue(subjects.contains("orderconfirmed"), subjects);
+        assertTrue(subjects.contains("\"" + ORDER_CREATED_TOPIC + "-value\""), subjects);
+        assertTrue(subjects.contains("\"" + ORDER_CONFIRMED_TOPIC + "-value\""), subjects);
+        assertTrue(subjects.contains("\"" + PAYMENT_AUTHORIZED_TOPIC + "-value\""), subjects);
 
         webTestClient
                 .method(GET)
@@ -296,8 +300,8 @@ class PlaceOrderFlowKafkaIntegrationTest {
                 1,
                 recordsFor(ORDER_CANCELLED_TOPIC, OrderCancelled.class, startedAt)
                         .size());
-        assertSubjectRegistered("stockreleased");
-        assertSubjectRegistered("ordercancelled");
+        assertSubjectRegistered(STOCK_RELEASED_TOPIC);
+        assertSubjectRegistered(ORDER_CANCELLED_TOPIC);
 
         webTestClient
                 .method(GET)
@@ -379,7 +383,7 @@ class PlaceOrderFlowKafkaIntegrationTest {
         assertEquals(
                 0,
                 recordsFor(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt).size());
-        assertSubjectRegistered("stockunavailable");
+        assertSubjectRegistered(STOCK_UNAVAILABLE_TOPIC);
     }
 
     /**
@@ -417,7 +421,7 @@ class PlaceOrderFlowKafkaIntegrationTest {
                 0,
                 recordsFor(ORDER_CONFIRMED_TOPIC, OrderConfirmed.class, startedAt)
                         .size());
-        assertSubjectRegistered("orderconfirmationrejected");
+        assertSubjectRegistered(ORDER_CONFIRMATION_REJECTED_TOPIC);
 
         var persisted = orderRepository.findByOrderId(orderId).orElseThrow();
         assertEquals(OrderStatus.CANCELLED, persisted.getStatus());
@@ -441,21 +445,22 @@ class PlaceOrderFlowKafkaIntegrationTest {
                 .isEmpty();
     }
 
+    /** As payments or inventory publish it: Confluent KafkaAvroSerializer, TopicNameStrategy. */
     private void publish(String topic, String key, Object payload) {
-        var avro = avroConverter.toMessage(
-                payload, new MessageHeaders(Map.of(MessageHeaders.CONTENT_TYPE, "application/*+avro")));
-        String contentType = String.valueOf(avro.getHeaders().get(MessageHeaders.CONTENT_TYPE));
         var props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
-        try (var producer = new KafkaProducer<String, byte[]>(props)) {
-            var record = new ProducerRecord<>(topic, key, (byte[]) avro.getPayload());
-            record.headers().add(MessageHeaders.CONTENT_TYPE, contentType.getBytes(StandardCharsets.UTF_8));
-            producer.send(record).get();
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
+        props.putAll(serdeConfig());
+        try (var producer = new KafkaProducer<String, Object>(props)) {
+            producer.send(new ProducerRecord<>(topic, key, payload)).get();
         } catch (Exception e) {
             throw new IllegalStateException("could not publish to " + topic, e);
         }
+    }
+
+    private Map<String, Object> serdeConfig() {
+        return Map.of("schema.registry.url", schemaRegistryUrl, "specific.avro.reader", true);
     }
 
     private <T> T awaitOne(String topic, Class<T> type, long since) {
@@ -467,23 +472,21 @@ class PlaceOrderFlowKafkaIntegrationTest {
     }
 
     private <T> List<T> recordsFor(String topic, Class<T> type, long since) {
-        return received.stream()
-                .filter(r -> r.topic().equals(topic) && r.timestamp() >= since)
+        return rawRecordsFor(topic, type, since).stream()
                 .map(r -> decode(r, type))
-                .filter(e -> orderId.equals(orderIdOf(e)))
                 .toList();
     }
 
-    @SuppressWarnings("unchecked")
+    private <T> List<ConsumerRecord<String, byte[]>> rawRecordsFor(String topic, Class<T> type, long since) {
+        return received.stream()
+                .filter(r -> r.topic().equals(topic) && r.timestamp() >= since)
+                .filter(r -> orderId.equals(orderIdOf(decode(r, type))))
+                .toList();
+    }
+
+    /** As a Confluent consumer reads it: KafkaAvroDeserializer, specific records. */
     private <T> T decode(ConsumerRecord<String, byte[]> record, Class<T> type) {
-        Header header = record.headers().lastHeader(MessageHeaders.CONTENT_TYPE);
-        String contentType = header == null
-                ? "application/*+avro"
-                : new String(header.value(), StandardCharsets.UTF_8).replace("\"", "");
-        var message = MessageBuilder.withPayload(record.value())
-                .setHeader(MessageHeaders.CONTENT_TYPE, contentType)
-                .build();
-        return (T) avroConverter.fromMessage(message, type);
+        return type.cast(avroDeserializer.deserialize(record.topic(), record.value()));
     }
 
     private static String orderIdOf(Object event) {
@@ -505,12 +508,12 @@ class PlaceOrderFlowKafkaIntegrationTest {
         return null;
     }
 
-    private void assertSubjectRegistered(String subjectFragment) {
+    private void assertSubjectRegistered(String topic) {
         String subjects = RestClient.create(schemaRegistryUrl)
                 .get()
                 .uri("/subjects")
                 .retrieve()
                 .body(String.class);
-        assertTrue(subjects.contains(subjectFragment), subjects);
+        assertTrue(subjects.contains("\"" + topic + "-value\""), subjects);
     }
 }

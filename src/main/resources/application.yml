@@ -37,11 +37,18 @@ spring:
         useServerPrepStmts: true
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    # Confluent wire format (ADR 0002): KafkaAvroSerializer/Deserializer, default TopicNameStrategy (<topic>-value),
+    # schemas in the Confluent Schema Registry (asyncapi-master.yml confluentSchemaRegistry)
+    properties:
+      schema.registry.url: ${SCHEMA_REGISTRY_URL}
+      specific.avro.reader: true
     # message keys are String (orderId); the generated producer sends no key
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
   cloud:
     function:
       # consumers of asyncapi-client.yml (generated beans in asyncapi.client); Spring Cloud Stream 5 reads
@@ -49,35 +56,33 @@ spring:
       definition: payment-authorized-event-v1;stock-released-event-v1
     stream:
       kafka.binder.enable-observation: true
-      # Avro payloads, schemas in the Confluent Schema Registry (config/SchemaRegistryConfiguration)
-      schema-registry-client:
-        endpoint: ${SCHEMA_REGISTRY_URL}
+      # payloads go through the Kafka (de)serializers above: native encoding/decoding on every binding
       bindings:
         # consumed (asyncapi-client.yml, group = x-groupId)
         payment-authorized-event-v1-in-0:
           destination: payments-processing.payment-authorized.event.avro.v1
           group: orders_checkout
-          content-type: application/*+avro
+          consumer.use-native-decoding: true
         stock-released-event-v1-in-0:
           destination: catalog-inventory.stock-released.event.avro.v1
           group: orders_checkout
-          content-type: application/*+avro
+          consumer.use-native-decoding: true
         # published (asyncapi.yml), StreamBridge binding names of DefaultOrdersCheckoutEventsProducer
         order-created-event-v1-out:
           destination: orders-checkout.order-created.event.avro.v1
-          content-type: application/*+avro
+          producer.use-native-encoding: true
         stock-unavailable-event-v1-out:
           destination: orders-checkout.stock-unavailable.event.avro.v1
-          content-type: application/*+avro
+          producer.use-native-encoding: true
         order-confirmed-event-v1-out:
           destination: orders-checkout.order-confirmed.event.avro.v1
-          content-type: application/*+avro
+          producer.use-native-encoding: true
         order-confirmation-rejected-event-v1-out:
           destination: orders-checkout.order-confirmation-rejected.event.avro.v1
-          content-type: application/*+avro
+          producer.use-native-encoding: true
         order-cancelled-event-v1-out:
           destination: orders-checkout.order-cancelled.event.avro.v1
-          content-type: application/*+avro
+          producer.use-native-encoding: true
 
 # synchronous calls to other services: see docs/backlog/http-clients.md
 arcadia:
