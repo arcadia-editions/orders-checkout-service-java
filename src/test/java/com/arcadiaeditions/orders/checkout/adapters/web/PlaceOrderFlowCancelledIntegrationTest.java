@@ -8,7 +8,10 @@ import com.arcadiaeditions.catalog.inventory.events.avro.StockReleased;
 import com.arcadiaeditions.orders.checkout.adapters.events.StockReleasedConsumerService;
 import com.arcadiaeditions.orders.checkout.asyncapi.provider.InMemoryOrdersCheckoutEventsProducer;
 import com.arcadiaeditions.orders.checkout.config.TestClock;
+import com.arcadiaeditions.orders.checkout.core.outbound.jpa.OrderRepository;
 import com.arcadiaeditions.orders.checkout.events.avro.OrderCancelled;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -28,6 +31,12 @@ class PlaceOrderFlowCancelledIntegrationTest extends BaseWebTestClientTest {
 
     @Autowired
     InMemoryOrdersCheckoutEventsProducer events;
+
+    @Autowired
+    OrderRepository orderRepository;
+
+    @PersistenceContext
+    EntityManager entityManager;
 
     @ParameterizedTest(name = "{1} cancels {0} order")
     @CsvSource({
@@ -60,6 +69,14 @@ class PlaceOrderFlowCancelledIntegrationTest extends BaseWebTestClientTest {
         var event = (OrderCancelled) cancelled.get(cancelled.size() - 1).getPayload();
         assertEquals(reason, event.getReason().toString());
 
+        // the service already flushed the cancellation; a second flush would only write the spurious UPDATE of
+        // the JSON value types (no equals) and bump the version again
+        entityManager.clear();
+        var persisted = orderRepository.findByOrderId(orderId).orElseThrow();
+        assertEquals(persisted.getVersion(), event.getVersion());
+        assertEquals(persisted.getCustomerId(), event.getCustomerId().toString());
+        assertEquals(persisted.getCustomerEmail(), event.getCustomerEmail().toString());
+
         webTestClient
                 .method(GET)
                 .uri("/api/orders/{id}", id)
@@ -80,7 +97,8 @@ class PlaceOrderFlowCancelledIntegrationTest extends BaseWebTestClientTest {
 
     private List<Message> cancelledFor(String orderId) {
         return events.getOnOrderCancelledCapturedMessages().stream()
-                .filter(m -> orderId.equals(((OrderCancelled) m.getPayload()).getOrderId().toString()))
+                .filter(m -> orderId.equals(
+                        ((OrderCancelled) m.getPayload()).getOrderId().toString()))
                 .toList();
     }
 }

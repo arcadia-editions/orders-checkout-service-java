@@ -14,6 +14,7 @@ public interface EventsMapper {
     @Mapping(target = "amount", source = "totalAmount")
     com.arcadiaeditions.orders.checkout.events.avro.OrderCreated asOrderCreated(Order order);
 
+    @Mapping(target = "shippingAddressBuilder", ignore = true)
     com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmed asOrderConfirmed(Order order);
 
     @Mapping(target = "reason", source = "reason")
@@ -31,6 +32,8 @@ public interface EventsMapper {
     com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable asStockUnavailable(
             StartOrderCheckoutInput input,
             String orderId,
-            java.util.List<com.arcadiaeditions.orders.checkout.core.outbound.inventory.StockUnavailableResult.StockUnavailableLine>
+            java.util.List<
+                            com.arcadiaeditions.orders.checkout.core.outbound.inventory.StockUnavailableResult
+                                    .StockUnavailableLine>
                     unavailableItems);
 }

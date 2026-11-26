@@ -82,7 +82,7 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
         order.setTotalAmount(input.getItems().stream()
                 .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
-        order = orderRepository.save(order);
+        order = orderRepository.saveAndFlush(order);
         // emit events
         var orderCreated = eventsMapper.asOrderCreated(order);
         eventsProducer.onOrderCreated(orderCreated);
@@ -108,7 +108,7 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
         }
         existing.setStatus(OrderStatus.CONFIRMED);
         existing.setConfirmedAt(Instant.now(clock));
-        var order = orderRepository.save(existing);
+        var order = orderRepository.saveAndFlush(existing);
         // emit events
         var orderConfirmed = eventsMapper.asOrderConfirmed(order);
         eventsProducer.onOrderConfirmed(orderConfirmed);
@@ -135,7 +135,7 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
         existing.setStatus(OrderStatus.CANCELLED);
         existing.setCancellationReason(input.getReason());
         existing.setCancelledAt(Instant.now(clock));
-        var order = orderRepository.save(existing);
+        var order = orderRepository.saveAndFlush(existing);
         // emit events
         var orderCancelled = eventsMapper.asOrderCancelled(order);
         eventsProducer.onOrderCancelled(orderCancelled);

@@ -1,6 +1,7 @@
 package com.arcadiaeditions.orders.checkout.adapters.events;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
@@ -114,8 +115,8 @@ class PlaceOrderFlowKafkaIntegrationTest {
 
     @Test
     void startCheckoutThenPaymentAuthorizedOnKafkaConfirmsTheOrder() {
-        assertTrue(
-                !eventsProducer.getClass().getSimpleName().startsWith("InMemory"),
+        assertFalse(
+                eventsProducer.getClass().getSimpleName().startsWith("InMemory"),
                 "the real producer must be wired, not " + eventsProducer.getClass());
 
         String requestBody = """
@@ -164,6 +165,16 @@ class PlaceOrderFlowKafkaIntegrationTest {
         // OrderConfirmed on orders-checkout.order-confirmed.event.avro.v1
         var confirmed = awaitOne(ORDER_CONFIRMED_TOPIC, OrderConfirmed.class, startedAt);
         assertEquals(orderId, confirmed.getOrderId().toString());
+        Awaitility.await()
+                .atMost(TIMEOUT)
+                .until(() ->
+                        orderRepository.findByOrderId(orderId).orElseThrow().getStatus()
+                                == com.arcadiaeditions.orders.checkout.core.domain.OrderStatus.CONFIRMED);
+        // the event carries the version flushed by confirmOrder; the commit may add one spurious UPDATE (JSON value
+        // types without equals), so the row can be ahead of it, never behind
+        int committed = orderRepository.findByOrderId(orderId).orElseThrow().getVersion();
+        assertTrue(confirmed.getVersion() > created.getVersion(), "confirmed after created");
+        assertTrue(confirmed.getVersion() <= committed, "event " + confirmed.getVersion() + " vs row " + committed);
         assertEquals(
                 1,
                 recordsFor(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt).size());
