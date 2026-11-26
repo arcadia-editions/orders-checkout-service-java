@@ -90,11 +90,11 @@ review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/r
       blocked by: T-10
       done: claude-code claude-sonnet
 
-- [!] T-23 advanced HITL Confluent wire format for Avro: KafkaAvroSerializer/Deserializer (native encoding/decoding, TopicNameStrategy subjects) instead of Spring Cloud Stream's Avro converter, so payments and inventory (Confluent serde) can read and write the same messages; needs io.confluent:kafka-avro-serializer and the Confluent Maven repository in pom.xml
+- [/] T-23 advanced AFK Confluent wire format for Avro: KafkaAvroSerializer/Deserializer (native encoding/decoding, TopicNameStrategy subjects) instead of Spring Cloud Stream's Avro converter, so payments and inventory (Confluent serde) can read and write the same messages; needs io.confluent:kafka-avro-serializer and the Confluent Maven repository in pom.xml
       model: ../api-contract-commons/asyncapi-master.yml (confluentSchemaRegistry), ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
       fixes: .zenwave/handoff/place-order-flow/reports/T-20.md (CHOICES)
       tests: PlaceOrderFlowKafkaIntegrationTest
-      blocked: person decision (pom.xml dependency)
+      decided: person 2026-11-26, Confluent serde, pom.xml dependency + repository allowed (ADR 0002)
 
 ## S2 stockGone
 path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableResult] > StockUnavailable
