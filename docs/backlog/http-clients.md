@@ -1,6 +1,6 @@
 # HTTP clients for synchronous calls
 
-Manual task, not on the flow board (`docs/tasks.md`). Do it before implementing the flow steps that call Catalog Inventory.
+Taken up by T-29 (place-order-flow board, S7), 2026-11-26. Was: manual task.
 
 ## Why
 
