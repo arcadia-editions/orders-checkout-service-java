@@ -5,6 +5,8 @@ import com.arcadiaeditions.orders.checkout.core.application.mappers.*;
 import com.arcadiaeditions.orders.checkout.core.domain.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.*;
 import com.arcadiaeditions.orders.checkout.core.inbound.dtos.*;
+import com.arcadiaeditions.orders.checkout.core.outbound.ids.OrderIdGenerator;
+import com.arcadiaeditions.orders.checkout.core.outbound.inventory.*;
 import com.arcadiaeditions.orders.checkout.core.outbound.jpa.*;
 // import com.arcadiaeditions.orders.checkout.events.avro.*;
 import java.math.*;
@@ -31,51 +33,92 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
 
     private final EventsMapper eventsMapper = EventsMapper.INSTANCE;
     private final OrdersCheckoutEventsProducer eventsProducer;
+    private final Clock clock;
+    private final InventoryClient inventoryClient;
+    private final OrderIdGenerator orderIdGenerator;
 
     /**
      * Constructor.
      */
-    public OrdersCheckoutServiceImpl(OrderRepository orderRepository, OrdersCheckoutEventsProducer eventsProducer) {
+    public OrdersCheckoutServiceImpl(
+            OrderRepository orderRepository,
+            OrdersCheckoutEventsProducer eventsProducer,
+            Clock clock,
+            InventoryClient inventoryClient,
+            OrderIdGenerator orderIdGenerator) {
         this.orderRepository = orderRepository;
         this.eventsProducer = eventsProducer;
+        this.clock = clock;
+        this.inventoryClient = inventoryClient;
+        this.orderIdGenerator = orderIdGenerator;
     }
 
     public Order startOrderCheckout(StartOrderCheckoutInput input) {
-        // TODO: call CatalogInventoryZdl InventoryService.reserveStock(ReserveStockInput) -> ReserveStockResult
 
         log.debug("Request startOrderCheckout: {}", input);
 
+        var orderId = orderIdGenerator.nextOrderId();
+        var reservation = inventoryClient.reserveStock(
+                orderId,
+                input.getItems().stream()
+                        .map(item -> new ReserveStockItem(item.getSku(), item.getQuantity()))
+                        .toList());
+        if (reservation instanceof StockUnavailableResult unavailable) {
+            // nothing persisted: only the event, and the exception the web adapter answers 409 from
+            eventsProducer.onStockUnavailable(
+                    eventsMapper.asStockUnavailable(input, orderId, unavailable.unavailableItems()));
+            throw new StockUnavailableException(
+                    orderId,
+                    unavailable.unavailableItems().stream()
+                            .map(line -> new StockUnavailableException.Line(
+                                    line.sku(), line.requestedQuantity(), line.availableQuantity()))
+                            .toList());
+        }
+
         var order = ordersCheckoutServiceMapper.update(new Order(), input);
-        // TODO: implement this method
+        order.setOrderId(orderId);
+        order.setStatus(OrderStatus.CREATED);
+        order.setCreatedAt(Instant.now(clock));
+        order.setTotalAmount(input.getItems().stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        order = orderRepository.saveAndFlush(order);
         // emit events
         var orderCreated = eventsMapper.asOrderCreated(order);
         eventsProducer.onOrderCreated(orderCreated);
-        var stockUnavailable = eventsMapper.asStockUnavailable(order);
-        eventsProducer.onStockUnavailable(stockUnavailable);
         return order;
     }
 
     public Order confirmOrder(ConfirmOrderInput input) {
-        // TODO: call CatalogInventoryZdl InventoryService.confirmStockReservation(ConfirmStockReservationInput) ->
-        // StockReservation
-        //       then emit one of: StockReservationConfirmed
 
         log.debug("Request confirmOrder: {}", input);
 
-        // TODO CUSTOM_REQUIRED: load the Order this transition applies to, e.g. by a correlation key in the input
-        Optional<Order> foundOrder = Optional.empty();
-        var order = foundOrder
-                .map(existingOrder -> {
-                    OrderTransitions.ensureCanConfirmOrder(existingOrder);
-                    ordersCheckoutServiceMapper.update(existingOrder, input);
-                    existingOrder.setStatus(OrderStatus.CONFIRMED);
-                    return existingOrder;
-                })
-                .map(orderRepository::save)
-                .orElseThrow();
+        var existing = orderRepository.findByOrderId(input.getOrderId()).orElseThrow();
+        if (existing.getStatus() == OrderStatus.CONFIRMED) {
+            // redelivery of PaymentAuthorized: no inventory call, no event
+            return existing;
+        }
+        if (existing.getStatus() == OrderStatus.CANCELLED) {
+            return rejectConfirmation(existing, "ORDER_CANCELLED");
+        }
+        OrderTransitions.ensureCanConfirmOrder(existing);
+        var confirmation = inventoryClient.confirmStockReservation(existing.getOrderId());
+        if (!(confirmation instanceof StockReservationConfirmedResult)) {
+            return rejectConfirmation(existing, "STOCK_NOT_HELD");
+        }
+        existing.setStatus(OrderStatus.CONFIRMED);
+        existing.setConfirmedAt(Instant.now(clock));
+        var order = orderRepository.saveAndFlush(existing);
         // emit events
         var orderConfirmed = eventsMapper.asOrderConfirmed(order);
         eventsProducer.onOrderConfirmed(orderConfirmed);
+        return order;
+    }
+
+    private Order rejectConfirmation(Order order, String reason) {
+        // no state change: only the event asking payments to void the late authorization
+        var rejected = eventsMapper.asOrderConfirmationRejected(order, reason, Instant.now(clock));
+        eventsProducer.onOrderConfirmationRejected(rejected);
         return order;
     }
 
@@ -83,17 +126,16 @@ public class OrdersCheckoutServiceImpl implements OrdersCheckoutService {
 
         log.debug("Request cancelOrder: {}", input);
 
-        // TODO CUSTOM_REQUIRED: load the Order this transition applies to, e.g. by a correlation key in the input
-        Optional<Order> foundOrder = Optional.empty();
-        var order = foundOrder
-                .map(existingOrder -> {
-                    OrderTransitions.ensureCanCancelOrder(existingOrder);
-                    ordersCheckoutServiceMapper.update(existingOrder, input);
-                    existingOrder.setStatus(OrderStatus.CANCELLED);
-                    return existingOrder;
-                })
-                .map(orderRepository::save)
-                .orElseThrow();
+        var existing = orderRepository.findByOrderId(input.getOrderId()).orElseThrow();
+        if (existing.getStatus() == OrderStatus.CANCELLED) {
+            // redelivery of StockReleased: no change, no event
+            return existing;
+        }
+        OrderTransitions.ensureCanCancelOrder(existing);
+        existing.setStatus(OrderStatus.CANCELLED);
+        existing.setCancellationReason(input.getReason());
+        existing.setCancelledAt(Instant.now(clock));
+        var order = orderRepository.saveAndFlush(existing);
         // emit events
         var orderCancelled = eventsMapper.asOrderCancelled(order);
         eventsProducer.onOrderCancelled(orderCancelled);

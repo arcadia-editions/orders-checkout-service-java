@@ -1,5 +1,6 @@
 package com.arcadiaeditions.orders.checkout.config;
 
+import com.arcadiaeditions.orders.checkout.core.inbound.StockUnavailableException;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.AfterThrowing;
@@ -70,19 +71,32 @@ public class LoggingAspectConfiguration {
 
         /**
          * Advice that logs methods throwing exceptions.
+         * <p>
+         * {@link StockUnavailableException} is the stockGone 409, an expected business outcome, so it is logged at
+         * DEBUG. Every other exception stays at ERROR.
          * @param joinPoint join point for advice.
          * @param e exception.
          */
         @AfterThrowing(pointcut = "applicationPackagePointcut() && springBeanPointcut()", throwing = "e")
         public void logAfterThrowing(JoinPoint joinPoint, Throwable e) {
             if (env.acceptsProfiles(Profiles.of(Constants.SPRING_PROFILE_DEVELOPMENT))) {
-                logger(joinPoint).error("Exception in {}() with cause = '{}' and exception = '{}'",
+                logThrown(joinPoint, e, "Exception in {}() with cause = '{}' and exception = '{}'",
                         joinPoint.getSignature().getName(), e.getCause() != null ? e.getCause() : "NULL",
                         e.getMessage(), e);
             }
             else {
-                logger(joinPoint).error("Exception in {}() with cause = {}", joinPoint.getSignature().getName(),
+                logThrown(joinPoint, e, "Exception in {}() with cause = {}", joinPoint.getSignature().getName(),
                         e.getCause() != null ? String.valueOf(e.getCause()) : "NULL");
+            }
+        }
+
+        private void logThrown(JoinPoint joinPoint, Throwable e, String format, Object... args) {
+            Logger log = logger(joinPoint);
+            if (e instanceof StockUnavailableException) {
+                log.debug(format, args);
+            }
+            else {
+                log.error(format, args);
             }
         }
 

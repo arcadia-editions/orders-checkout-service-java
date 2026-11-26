@@ -1,0 +1,212 @@
+# PlaceOrderFlow: tasks
+
+flow: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl
+baseline: baseline/place-order-flow-5
+branch: afk/place-order-flow
+
+<!--
+Scope: the OrdersCheckout bounded context (this repository) only. The steps of the other contexts (inventory,
+payments, fulfillment, notifications) are boards of their own repositories; here they are stubs or Kafka messages.
+Model paths: ZFL = ../arcadia-editions-architecture/business-flows/place-order-flow.zfl,
+ZDL = ../orders-checkout-api/domain-model.zdl, inventory ZDL = ../catalog-inventory-api/domain-model.zdl.
+Test data chains C-01..C-10: header of src/test/resources/data.sql.
+Approved models: orders-checkout-api service-all 0.2.0 (tag release/service-all/v0.2.0), catalog-inventory-api
+service-all 0.2.0 (consumed Avro); ZFL at arcadia-editions-architecture tag baseline/place-order-flow-<n>.
+-->
+
+## S0 Baseline
+review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/review-S0b.md
+
+- [x] T-01 mechanical AFK Generated tests that should pass do: getOrderTest with a fixture id, updateTest without Instant.now()/OrderItem equality, API tests with a datasource
+      test data: data/jpa/Order/1.json, data.sql (C-01, id 1)
+      tests: OrdersCheckoutServiceTest, OrderRepositoryIntegrationTest, OrdersCheckoutApiControllerTest#getOrderTest, OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_400
+      done: grok grok-4.7
+- [x] T-02 mechanical AFK Inject a java.time.Clock (system clock in main, fixed 2026-10-14T10:00:00Z in tests) for every timestamp the service sets
+      tests: OrdersCheckoutServiceTest
+      done: grok grok-4.7
+- [x] T-03 mechanical AFK OrderRepository.findByOrderId (JPA and in-memory twin): commands correlate by orderId
+      model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:113-121
+      test data: data.sql (C-02, C-06)
+      tests: OrderRepositoryIntegrationTest
+      done: grok grok-4.7
+- [x] T-04 bounded HITL Decide how orderId is generated (format, who generates it) and record it as an ADR; ZDL and ZFL do not say
+      model: ../orders-checkout-api/domain-model.zdl:58, ../orders-checkout-api/domain-model.zdl:92-111
+      done: person (HITL), docs/adr/0001-order-id.md
+- [x] T-05 advanced AFK Outbound port InventoryClient (reserveStock, confirmStockReservation) with its REST adapter on catalog-inventory /inventory/reservations/{reserve,confirm}, and an in-memory stub for tests (SKU-004 unavailable, NOT_HELD by orderId)
+      model: ../orders-checkout-api/domain-model.zdl:129, ../orders-checkout-api/domain-model.zdl:138, ../catalog-inventory-api/domain-model.zdl:115-145, ../catalog-inventory-api/domain-model.zdl:169-171, ../catalog-inventory-api/domain-model.zdl:192-194, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:101-105, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:171-176
+      tests: InventoryClientStubTest
+      done: claude-code claude-opus
+      blocked by: T-01
+
+- [x] T-18 mechanical AFK ArchitectureTest: let the core reach the generated AsyncAPI SDK and Avro models (asyncapi.provider, asyncapi.client, events.avro), outside the hexagon by design (overlay Shape); respectsLayersForHexagonalArchitecture green, no other rule weakened
+      tests: ArchitectureTest
+      decided by: person, 2026-11-25 (option 1)
+      done: grok grok-4.7
+- [x] T-19 mechanical AFK S0 review fixes: drop OrdersCheckoutServiceImpl.clock() accessor and the T-02 tests that compare a constant with itself (keep the profile test, move it to a config test); TestClock.NOW instead of the literal in OrderRepositoryIntegrationTest and OrdersCheckoutServiceTest, stale "T-02" comment; one assertEquals style; InventoryClientRestAdapter throws when the body for the outcome is missing; unit test for UuidV7OrderIdGenerator (version 7, variant, time order)
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S0.md
+      tests: OrdersCheckoutServiceTest, InventoryClientRestAdapterTest, OrderRepositoryIntegrationTest, UuidV7OrderIdGeneratorTest
+      blocked by: T-06
+      done: claude-code claude-sonnet
+
+## S1 completed (tracer bullet)
+path: StartOrderCheckout > startOrderCheckout > reserveStock[StockReservedResult] > OrderCreated
+      > authorizePayment[authorized] > PaymentAuthorized > confirmOrder[confirmed] > confirmStockReservation
+      > OrderConfirmed > ... > end completed
+review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/review-S1-final.md
+
+- [x] T-06 bounded AFK startOrderCheckout reserved: new orderId, reserveStock, totalAmount = sum(quantity * unitPrice), CREATED + createdAt, persist, emit only OrderCreated
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:79-93, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:150-160
+      test data: data.sql (C-02 for the shape of a CREATED order)
+      tests: OrdersCheckoutServiceTest#startOrderCheckoutTest, OrdersCheckoutApiControllerTest#startOrderCheckoutTest
+      blocked by: T-02, T-03, T-04, T-05
+      done: claude-code claude-sonnet
+- [x] T-07 bounded AFK confirmOrder confirmed: load by orderId, confirmStockReservation, CONFIRMED + confirmedAt, persist, emit OrderConfirmed with items and shippingAddress; no-op on CONFIRMED (redelivery)
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:174-193
+      test data: data.sql (C-02 confirmed, C-01 redelivery)
+      tests: OrdersCheckoutServiceTest#confirmOrderTest
+      blocked by: T-02, T-03, T-05
+      done: claude-code claude-sonnet
+- [x] T-08 mechanical AFK PaymentAuthorizedConsumerService: map PaymentAuthorized.orderId to ConfirmOrderInput and call confirmOrder
+      model: ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:113-115
+      test data: data.sql (C-02)
+      tests: PaymentAuthorizedConsumerServiceTest
+      blocked by: T-07
+      done: grok grok-4.7
+- [x] T-09 bounded AFK Flow test completed (orders side): POST start-checkout 201 emits OrderCreated; PaymentAuthorized confirms it and emits OrderConfirmed; GET shows CONFIRMED
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-342
+      test data: data.sql (C-01, C-02)
+      tests: OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_201, PlaceOrderFlowCompletedIntegrationTest
+      blocked by: T-06, T-08
+      done: claude-code claude-sonnet
+
+- [x] T-20 advanced AFK Kafka wiring of the slice: application.yml spring.cloud.stream bindings for the consumers payment-authorized-event-v1 and stock-released-event-v1 (in-0, group orders-checkout) and destinations of every *-out binding as asyncapi.yml / asyncapi-client.yml name the topics, Avro content type and Schema Registry; one Kafka Testcontainers test (docker-compose) that publishes PaymentAuthorized to its topic and consumes OrderCreated and OrderConfirmed from theirs, without the in-memory producer
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:113, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155, ../orders-checkout-api/domain-model.zdl:136, ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (FIX FIRST)
+      tests: PlaceOrderFlowKafkaIntegrationTest
+      done: claude-code claude-opus
+- [x] T-21 bounded AFK S1 review fixes: recording InventoryClientStub and asserts that startOrderCheckout reserved the persisted orderId with the requested sku/quantity lines; OrderConfirmed.version after the confirm write (assert in PlaceOrderFlowCompletedIntegrationTest, emit after flush if stale); TestClock.NOW in OrdersCheckoutApiControllerTest
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S1.md (SHOULD FIX, NOTEs)
+      tests: OrdersCheckoutServiceTest, OrdersCheckoutApiControllerTest, PlaceOrderFlowCompletedIntegrationTest
+      blocked by: T-10
+      done: claude-code claude-sonnet
+
+## S2 stockGone
+path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableResult] > StockUnavailable
+      > sendStockUnavailableNotification > end stockGone
+review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/review-S2-final.md
+
+- [x] T-10 bounded AFK startOrderCheckout unavailable: persist nothing, emit StockUnavailable (orderId, customer, unavailableItems from the result), answer 409 with StockUnavailable body
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:88-92, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:162-172, ../orders-checkout-api/openapi-overlay.yml
+      test data: inventory stub SKU-004 (stub-driven, no row: the order is never persisted)
+      tests: OrdersCheckoutServiceTest#startOrderCheckoutStockUnavailableTest, OrdersCheckoutApiIntegrationTest#testStartOrderCheckout_409
+      blocked by: T-06
+      done: claude-code claude-sonnet
+- [x] T-11 bounded AFK Flow test stockGone (orders side): POST start-checkout with SKU-004 answers 409, no Order row, StockUnavailable emitted
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-343
+      tests: PlaceOrderFlowStockGoneIntegrationTest
+      blocked by: T-10
+      done: claude-code claude-sonnet
+
+- [x] T-22 mechanical AFK S2 review fixes: remove the dead generated EventsMapper.asStockUnavailable(Order); PlaceOrderFlowStockGoneIntegrationTest checks "no OrderCreated" with the typed getOrderId() filter like createdFor
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S2.md (NOTEs)
+      tests: OrdersCheckoutServiceTest, PlaceOrderFlowStockGoneIntegrationTest
+      done: grok grok-4.7
+
+## S3 orderCancelled
+path: ... > PaymentDeclined | PaymentRetryExhausted | PaymentVoided | PaymentVoidFailed | ReservationExpired
+      > releaseStock / expireReservation > StockReleased > cancelOrder > OrderCancelled
+      > sendOrderCancelledNotification > end orderCancelled
+review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S3-final.md
+
+- [x] T-12 bounded AFK cancelOrder: load by orderId, CREATED or CONFIRMED to CANCELLED, cancellationReason = input.reason, cancelledAt, persist, emit OrderCancelled; no-op, no event, on CANCELLED
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:300-310, ../orders-checkout-api/domain-model.zdl:117-121, ../orders-checkout-api/domain-model.zdl:141-144, ../orders-checkout-api/domain-model.zdl:195-205
+      test data: data.sql (C-03 from CREATED, C-04 from CONFIRMED, C-07 redelivery)
+      tests: OrdersCheckoutServiceTest#cancelOrderTest
+      blocked by: T-02, T-03
+      done: claude-code claude-sonnet
+- [x] T-13 mechanical AFK StockReleasedConsumerService: map StockReleased (orderId, reason name) to CancelOrderInput and call cancelOrder
+      model: ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/domain-model.zdl:117-121, ../catalog-inventory-api/domain-model.zdl:74-80
+      test data: data.sql (C-03)
+      tests: StockReleasedConsumerServiceTest
+      blocked by: T-12
+      done: grok grok-4.7
+- [x] T-14 bounded AFK Flow test orderCancelled (orders side), one case per cause: PAYMENT_DECLINED, PAYMENT_RETRY_EXHAUSTED, RESERVATION_EXPIRED from CREATED; PAYMENT_VOIDED, PAYMENT_VOID_FAILED from CONFIRMED; GET shows CANCELLED with the reason
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:262-266, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-344
+      test data: data.sql (C-03, C-04, C-06..C-10)
+      tests: PlaceOrderFlowCancelledIntegrationTest
+      blocked by: T-13
+      done: claude-code claude-sonnet
+
+## S4 late authorization rejected
+path: ... > PaymentAuthorized > confirmOrder[stock-not-held | order-cancelled] > OrderConfirmationRejected
+      > voidPayment > PaymentVoided > releaseStock > StockReleased > cancelOrder > end orderCancelled
+review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S4-final.md
+
+- [x] T-15 bounded AFK confirmOrder rejected: on CANCELLED emit OrderConfirmationRejected ORDER_CANCELLED; on NOT_HELD emit it with STOCK_NOT_HELD; no state change (EventsMapper asOrderConfirmationRejected with reason and rejectedAt)
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:147-164, ../orders-checkout-api/domain-model.zdl:132-139, ../orders-checkout-api/domain-model.zdl:206-214, ../catalog-inventory-api/domain-model.zdl:115-125
+      test data: data.sql (C-05 stock-not-held, C-06 order-cancelled)
+      tests: OrdersCheckoutServiceTest#confirmOrderRejectedTest
+      blocked by: T-07
+      done: claude-code claude-sonnet
+- [x] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164
+      test data: data.sql (C-05, C-06)
+      tests: PlaceOrderFlowLateAuthorizationIntegrationTest
+      blocked by: T-08, T-15
+      done: claude-code claude-sonnet
+
+## S5 polish
+review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S5-final.md
+
+- [x] T-17 mechanical AFK getOrder read side: 200 for CREATED (C-02), CONFIRMED (C-01), CANCELLED (C-06) and 404 for an unknown id
+      model: ../orders-checkout-api/domain-model.zdl:146-147
+      test data: data.sql (C-01, C-02, C-06)
+      tests: OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testGetOrder_400, OrdersCheckoutApiControllerTest#getOrderTest
+      blocked by: T-01
+      done: grok grok-4.7
+- [x] T-24 mechanical AFK LoggingAspectConfiguration does not log StockUnavailableException (business 409 of stockGone) at ERROR; log it at DEBUG or skip it, other exceptions unchanged
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S2-final.md (STANDARDS NOTE)
+      tests: LoggingAspectConfigurationTest
+      done: grok grok-4.7
+- [x] T-25 bounded AFK Event version is the persisted one: startOrderCheckout, confirmOrder and cancelOrder map their event after the write is flushed (saveAndFlush); PlaceOrderFlowCancelledIntegrationTest flushes and clears before the final GET and asserts OrderCancelled.version == persisted version, customerId and customerEmail; remove dead OrdersCheckoutServiceMapper asOrder/update for CancelOrderInput and ConfirmOrderInput; PlaceOrderFlowKafkaIntegrationTest asserts OrderConfirmed.version == committed row version; EventsMapper asOrderConfirmed ignores shippingAddressBuilder; assertFalse instead of assertTrue(!...); spotless:apply on PlaceOrderFlowLateAuthorizationIntegrationTest, PlaceOrderFlowCancelledIntegrationTest, EventsMapper
+      model: ../orders-checkout-api/domain-model.zdl:150-205
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S3-final.md (SHOULD FIX x2, NOTEs), review-S1-final.md (SHOULD FIX version, NOTEs), review-S4-final.md (SHOULD FIX spotless)
+      tests: OrdersCheckoutServiceTest, PlaceOrderFlowCancelledIntegrationTest, PlaceOrderFlowCompletedIntegrationTest, PlaceOrderFlowKafkaIntegrationTest
+      done: claude-code claude-sonnet
+- [x] T-26 mechanical AFK S5 review fixes: spotless:apply on LoggingAspectConfigurationTest; PlaceOrderFlowCompletedIntegrationTest clears the EntityManager and asserts OrderConfirmed.version == the row's version, like PlaceOrderFlowCancelledIntegrationTest
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S5-final.md (SHOULD FIX, MODEL NOTE 1)
+      tests: LoggingAspectConfigurationTest, PlaceOrderFlowCompletedIntegrationTest
+      done: grok grok-4.7
+
+## S6 check-mode gaps
+review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S6-final.md
+
+- [x] T-27 mechanical AFK Kafka wiring of the cancelled, stockGone and late-authorization paths: StockReleased on catalog-inventory.stock-released.event.avro.v1 reaches cancelOrder (stock-released-event-v1-in-0 started in the test) and OrderCancelled lands on orders-checkout.order-cancelled.event.avro.v1; start-checkout with SKU-004 puts StockUnavailable on orders-checkout.stock-unavailable.event.avro.v1; PaymentAuthorized for ORD-006 puts OrderConfirmationRejected on orders-checkout.order-confirmation-rejected.event.avro.v1
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:88-92, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:305-309, ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
+      test data: data.sql (C-03, C-06; SKU-004 stub-driven)
+      fixes: .zenwave/handoff/place-order-flow/reports/check-mode.md
+      tests: PlaceOrderFlowKafkaIntegrationTest
+      done: grok grok-4.7
+- [x] T-28 mechanical AFK OrderCreated carries what authorizePayment needs: assert customerId, customerEmail and paymentMethodId of the emitted OrderCreated (unit and flow test)
+      model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:91, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:114-122, ../orders-checkout-api/domain-model.zdl:150-160
+      fixes: .zenwave/handoff/place-order-flow/reports/check-mode.md
+      tests: OrdersCheckoutServiceTest#startOrderCheckoutTest, PlaceOrderFlowCompletedIntegrationTest
+      done: claude-code claude-sonnet
+
+## S7 person requests (after S6)
+review: [x] claude-sonnet, .zenwave/handoff/place-order-flow/reports/review-S7.md
+
+- [x] T-23 advanced AFK Confluent wire format for Avro: KafkaAvroSerializer/Deserializer (native encoding/decoding, TopicNameStrategy subjects) instead of Spring Cloud Stream's Avro converter, so payments and inventory (Confluent serde) can read and write the same messages; needs io.confluent:kafka-avro-serializer and the Confluent Maven repository in pom.xml
+      model: ../api-contract-commons/asyncapi-master.yml (confluentSchemaRegistry), ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
+      fixes: .zenwave/handoff/place-order-flow/reports/T-20.md (CHOICES)
+      tests: PlaceOrderFlowKafkaIntegrationTest
+      decided: person 2026-11-26, Confluent serde, pom.xml dependency + repository allowed (ADR 0002)
+      done: claude-code claude-opus
+
+- [x] T-29 advanced AFK Generated catalog-inventory HTTP client: second openapi-generator-maven-plugin execution (spring, library spring-http-interface, interfaces only) from catalog-inventory-api service-all 0.2.0 openapi.yml, reserveStock and confirmStockReservation only, into ${basePackage}.clients.inventory; CatalogInventoryClientConfiguration builds it with HttpServiceProxyFactory over a RestClient; InventoryClientRestAdapter implements InventoryClient with the generated interface and maps DTOs (MapStruct); the hand-written request/response classes go away; behavior unchanged (same port, same results, same tests)
+      model: ../catalog-inventory-api/openapi.yml, ../catalog-inventory-api/domain-model.zdl:115-145, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:101-105, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:171-176, docs/backlog/http-clients.md
+      tests: InventoryClientRestAdapterTest, ArchitectureTest
+      decided: person 2026-11-26, generated client, pom.xml execution + plugin dependency allowed
+      done: claude-code claude-opus
+      blocked by: T-23
+
