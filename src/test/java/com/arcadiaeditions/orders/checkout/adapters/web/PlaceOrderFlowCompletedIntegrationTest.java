@@ -7,10 +7,13 @@ import static org.springframework.http.HttpMethod.POST;
 
 import com.arcadiaeditions.orders.checkout.adapters.events.PaymentAuthorizedConsumerService;
 import com.arcadiaeditions.orders.checkout.asyncapi.provider.InMemoryOrdersCheckoutEventsProducer;
+import com.arcadiaeditions.orders.checkout.core.outbound.jpa.OrderRepository;
 import com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmed;
 import com.arcadiaeditions.orders.checkout.events.avro.OrderCreated;
 import com.arcadiaeditions.payments.processing.events.avro.PaymentAuthorized;
 import com.jayway.jsonpath.JsonPath;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +32,12 @@ class PlaceOrderFlowCompletedIntegrationTest extends BaseWebTestClientTest {
 
     @Autowired
     InMemoryOrdersCheckoutEventsProducer events;
+
+    @Autowired
+    OrderRepository orderRepository;
+
+    @PersistenceContext
+    EntityManager entityManager;
 
     @Test
     void startCheckoutThenPaymentAuthorizedConfirmsTheOrder() {
@@ -72,11 +81,18 @@ class PlaceOrderFlowCompletedIntegrationTest extends BaseWebTestClientTest {
         paymentAuthorizedConsumer.onPaymentAuthorizedEventV1(payment, null);
 
         assertEquals(1, confirmedFor(orderId).size());
+        var confirmed = (OrderConfirmed) confirmedFor(orderId).get(0).getPayload();
         long createdVersion = ((OrderCreated) createdFor(orderId).get(0).getPayload()).getVersion();
-        long confirmedVersion = ((OrderConfirmed) confirmedFor(orderId).get(0).getPayload()).getVersion();
+        long confirmedVersion = confirmed.getVersion();
         assertTrue(
                 confirmedVersion > createdVersion,
                 "OrderConfirmed.version " + confirmedVersion + " must be after OrderCreated.version " + createdVersion);
+
+        // the service already flushed the confirmation; a second flush would only write the spurious UPDATE of
+        // the JSON value types (no equals) and bump the version again
+        entityManager.clear();
+        var persisted = orderRepository.findByOrderId(orderId).orElseThrow();
+        assertEquals(persisted.getVersion(), confirmed.getVersion());
 
         webTestClient
                 .method(GET)
