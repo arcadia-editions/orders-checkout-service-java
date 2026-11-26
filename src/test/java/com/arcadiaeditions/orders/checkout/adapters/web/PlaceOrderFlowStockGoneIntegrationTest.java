@@ -6,6 +6,7 @@ import static org.springframework.http.HttpMethod.POST;
 
 import com.arcadiaeditions.orders.checkout.asyncapi.provider.InMemoryOrdersCheckoutEventsProducer;
 import com.arcadiaeditions.orders.checkout.core.outbound.jpa.OrderRepository;
+import com.arcadiaeditions.orders.checkout.events.avro.OrderCreated;
 import com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable;
 import com.jayway.jsonpath.JsonPath;
 import java.util.List;
@@ -78,11 +79,14 @@ class PlaceOrderFlowStockGoneIntegrationTest extends BaseWebTestClientTest {
         assertEquals(3, event.getUnavailableItems().get(0).getRequestedQuantity());
         assertEquals(0, event.getUnavailableItems().get(0).getAvailableQuantity());
 
-        assertEquals(
-                0,
-                events.getOnOrderCreatedCapturedMessages().stream()
-                        .filter(m -> m.getPayload().toString().contains(orderId))
-                        .count());
+        assertEquals(0, createdFor(orderId).size());
+    }
+
+    private List<Message> createdFor(String orderId) {
+        return events.getOnOrderCreatedCapturedMessages().stream()
+                .filter(m -> orderId.equals(
+                        ((OrderCreated) m.getPayload()).getOrderId().toString()))
+                .toList();
     }
 
     private List<Message> unavailableFor(String orderId) {

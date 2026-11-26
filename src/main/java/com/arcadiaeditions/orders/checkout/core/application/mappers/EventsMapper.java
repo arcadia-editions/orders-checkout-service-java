@@ -24,8 +24,6 @@ public interface EventsMapper {
     @Mapping(target = "reason", source = "cancellationReason")
     com.arcadiaeditions.orders.checkout.events.avro.OrderCancelled asOrderCancelled(Order order);
 
-    com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable asStockUnavailable(Order order);
-
     @Mapping(target = "orderId", source = "orderId")
     @Mapping(target = "customerId", source = "input.customerId")
     @Mapping(target = "customerEmail", source = "input.customerEmail")
