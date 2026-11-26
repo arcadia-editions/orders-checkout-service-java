@@ -74,6 +74,10 @@ class PlaceOrderFlowCompletedIntegrationTest extends BaseWebTestClientTest {
         long id = ((Number) JsonPath.read(json, "$.id")).longValue();
 
         assertEquals(1, createdFor(orderId).size());
+        var created = (OrderCreated) createdFor(orderId).get(0).getPayload();
+        assertEquals("CUS-100", created.getCustomerId().toString());
+        assertEquals("reader@example.com", created.getCustomerEmail().toString());
+        assertEquals("PM-100", created.getPaymentMethodId().toString());
         assertEquals(0, confirmedFor(orderId).size());
 
         var payment = new PaymentAuthorized();
