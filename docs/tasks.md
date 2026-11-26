@@ -192,7 +192,8 @@ review: [ ]
       test data: data.sql (C-03, C-06; SKU-004 stub-driven)
       fixes: .zenwave/handoff/place-order-flow/reports/check-mode.md
       tests: PlaceOrderFlowKafkaIntegrationTest
-- [/] T-28 mechanical AFK OrderCreated carries what authorizePayment needs: assert customerId, customerEmail and paymentMethodId of the emitted OrderCreated (unit and flow test)
+- [x] T-28 mechanical AFK OrderCreated carries what authorizePayment needs: assert customerId, customerEmail and paymentMethodId of the emitted OrderCreated (unit and flow test)
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:91, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:114-122, ../orders-checkout-api/domain-model.zdl:150-160
       fixes: .zenwave/handoff/place-order-flow/reports/check-mode.md
       tests: OrdersCheckoutServiceTest#startOrderCheckoutTest, PlaceOrderFlowCompletedIntegrationTest
+      done: claude-code claude-sonnet
