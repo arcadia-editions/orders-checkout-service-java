@@ -136,11 +136,12 @@ review: [ ]
       tests: StockReleasedConsumerServiceTest
       blocked by: T-12
       done: grok grok-4.7
-- [/] T-14 bounded AFK Flow test orderCancelled (orders side), one case per cause: PAYMENT_DECLINED, PAYMENT_RETRY_EXHAUSTED, RESERVATION_EXPIRED from CREATED; PAYMENT_VOIDED, PAYMENT_VOID_FAILED from CONFIRMED; GET shows CANCELLED with the reason
+- [x] T-14 bounded AFK Flow test orderCancelled (orders side), one case per cause: PAYMENT_DECLINED, PAYMENT_RETRY_EXHAUSTED, RESERVATION_EXPIRED from CREATED; PAYMENT_VOIDED, PAYMENT_VOID_FAILED from CONFIRMED; GET shows CANCELLED with the reason
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:262-266, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:340-344
       test data: data.sql (C-03, C-04, C-06..C-10)
       tests: PlaceOrderFlowCancelledIntegrationTest
       blocked by: T-13
+      done: claude-code claude-sonnet
 
 ## S4 late authorization rejected
 path: ... > PaymentAuthorized > confirmOrder[stock-not-held | order-cancelled] > OrderConfirmationRejected
@@ -153,7 +154,7 @@ review: [ ]
       tests: OrdersCheckoutServiceTest#confirmOrderRejectedTest
       blocked by: T-07
       done: claude-code claude-sonnet
-- [ ] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
+- [/] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164
       test data: data.sql (C-05, C-06)
       tests: PlaceOrderFlowLateAuthorizationIntegrationTest
