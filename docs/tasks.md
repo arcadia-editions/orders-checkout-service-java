@@ -52,7 +52,7 @@ review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/r
 path: StartOrderCheckout > startOrderCheckout > reserveStock[StockReservedResult] > OrderCreated
       > authorizePayment[authorized] > PaymentAuthorized > confirmOrder[confirmed] > confirmStockReservation
       > OrderConfirmed > ... > end completed
-review: [ ]
+review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/review-S1-final.md
 
 - [x] T-06 bounded AFK startOrderCheckout reserved: new orderId, reserveStock, totalAmount = sum(quantity * unitPrice), CREATED + createdAt, persist, emit only OrderCreated
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:79-93, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:150-160
@@ -173,8 +173,8 @@ review: [ ]
 - [/] T-24 mechanical AFK LoggingAspectConfiguration does not log StockUnavailableException (business 409 of stockGone) at ERROR; log it at DEBUG or skip it, other exceptions unchanged
       fixes: .zenwave/handoff/place-order-flow/reports/review-S2-final.md (STANDARDS NOTE)
       tests: LoggingAspectConfigurationTest
-- [ ] T-25 bounded AFK Event version is the persisted one: startOrderCheckout, confirmOrder and cancelOrder map their event after the write is flushed (saveAndFlush); PlaceOrderFlowCancelledIntegrationTest flushes and clears before the final GET and asserts OrderCancelled.version == persisted version, customerId and customerEmail; remove dead OrdersCheckoutServiceMapper asOrder/update for CancelOrderInput and ConfirmOrderInput
+- [ ] T-25 bounded AFK Event version is the persisted one: startOrderCheckout, confirmOrder and cancelOrder map their event after the write is flushed (saveAndFlush); PlaceOrderFlowCancelledIntegrationTest flushes and clears before the final GET and asserts OrderCancelled.version == persisted version, customerId and customerEmail; remove dead OrdersCheckoutServiceMapper asOrder/update for CancelOrderInput and ConfirmOrderInput; PlaceOrderFlowKafkaIntegrationTest asserts OrderConfirmed.version == committed row version; EventsMapper asOrderConfirmed ignores shippingAddressBuilder; assertFalse instead of assertTrue(!...)
       model: ../orders-checkout-api/domain-model.zdl:150-205
-      fixes: .zenwave/handoff/place-order-flow/reports/review-S3-final.md (SHOULD FIX x2, NOTEs)
-      tests: OrdersCheckoutServiceTest, PlaceOrderFlowCancelledIntegrationTest, PlaceOrderFlowCompletedIntegrationTest
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S3-final.md (SHOULD FIX x2, NOTEs), review-S1-final.md (SHOULD FIX version, NOTEs)
+      tests: OrdersCheckoutServiceTest, PlaceOrderFlowCancelledIntegrationTest, PlaceOrderFlowCompletedIntegrationTest, PlaceOrderFlowKafkaIntegrationTest
       blocked by: T-24
