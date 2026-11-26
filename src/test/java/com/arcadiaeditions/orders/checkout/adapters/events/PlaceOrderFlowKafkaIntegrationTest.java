@@ -6,11 +6,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 
+import com.arcadiaeditions.catalog.inventory.events.avro.StockReleaseReason;
+import com.arcadiaeditions.catalog.inventory.events.avro.StockReleased;
 import com.arcadiaeditions.orders.checkout.asyncapi.provider.OrdersCheckoutEventsProducer;
 import com.arcadiaeditions.orders.checkout.config.DockerComposeInitializer;
+import com.arcadiaeditions.orders.checkout.config.TestClock;
+import com.arcadiaeditions.orders.checkout.core.domain.OrderStatus;
 import com.arcadiaeditions.orders.checkout.core.outbound.jpa.OrderRepository;
+import com.arcadiaeditions.orders.checkout.events.avro.OrderCancelled;
+import com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmationRejected;
 import com.arcadiaeditions.orders.checkout.events.avro.OrderConfirmed;
 import com.arcadiaeditions.orders.checkout.events.avro.OrderCreated;
+import com.arcadiaeditions.orders.checkout.events.avro.StockUnavailable;
 import com.arcadiaeditions.payments.processing.events.avro.PaymentAuthorized;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
@@ -49,16 +56,20 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * place-order-flow over Kafka (ZFL 113, 155; ZDL 136): start-checkout publishes OrderCreated to its topic,
- * PaymentAuthorized on the payments topic reaches confirmOrder through the payment-authorized-event-v1 binding, and
- * OrderConfirmed lands on its topic. Real producer (StreamBridge), Avro payloads through the compose Schema Registry.
- * Not transactional: the binder thread must see the committed order.
+ * place-order-flow over Kafka. S1 (ZFL 91, 155; ZDL 136): start-checkout publishes OrderCreated, PaymentAuthorized
+ * reaches confirmOrder through payment-authorized-event-v1-in-0, and OrderConfirmed lands on its topic. S3 (ZFL
+ * 306-308; ZDL 142): StockReleased reaches cancelOrder through stock-released-event-v1-in-0 (started here, same as
+ * the payment binding) and OrderCancelled lands on its topic. S2 (ZFL 92): start-checkout with SKU-004 publishes
+ * StockUnavailable. S4 (ZFL 162-163): PaymentAuthorized for a cancelled order publishes OrderConfirmationRejected.
+ * Real producer (StreamBridge), Avro payloads through the compose Schema Registry. Not transactional: the binder
+ * thread must see the committed order.
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
         properties = {
             "arcadia.test.events-producer=kafka",
-            "spring.cloud.stream.bindings.payment-authorized-event-v1-in-0.consumer.auto-startup=true"
+            "spring.cloud.stream.bindings.payment-authorized-event-v1-in-0.consumer.auto-startup=true",
+            "spring.cloud.stream.bindings.stock-released-event-v1-in-0.consumer.auto-startup=true"
         })
 @ActiveProfiles("test")
 @DockerComposeInitializer.EnableDockerCompose
@@ -66,7 +77,11 @@ class PlaceOrderFlowKafkaIntegrationTest {
 
     static final String ORDER_CREATED_TOPIC = "orders-checkout.order-created.event.avro.v1";
     static final String ORDER_CONFIRMED_TOPIC = "orders-checkout.order-confirmed.event.avro.v1";
+    static final String ORDER_CANCELLED_TOPIC = "orders-checkout.order-cancelled.event.avro.v1";
+    static final String STOCK_UNAVAILABLE_TOPIC = "orders-checkout.stock-unavailable.event.avro.v1";
+    static final String ORDER_CONFIRMATION_REJECTED_TOPIC = "orders-checkout.order-confirmation-rejected.event.avro.v1";
     static final String PAYMENT_AUTHORIZED_TOPIC = "payments-processing.payment-authorized.event.avro.v1";
+    static final String STOCK_RELEASED_TOPIC = "catalog-inventory.stock-released.event.avro.v1";
     static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     @Autowired
@@ -90,10 +105,16 @@ class PlaceOrderFlowKafkaIntegrationTest {
     WebTestClient webTestClient;
     KafkaConsumer<String, byte[]> consumer;
     final List<ConsumerRecord<String, byte[]>> received = new ArrayList<>();
+    /** Filters Kafka records. Also set for fixture ORD-006, which cleanup must not delete. */
     String orderId;
+    /** Row this test inserted via start-checkout. Unset for fixture ORD-006. */
+    String createdOrderId;
 
     @BeforeEach
     void setup() {
+        orderId = null;
+        createdOrderId = null;
+        received.clear();
         webTestClient = MockMvcWebTestClient.bindToApplicationContext(context).build();
         var props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -102,14 +123,19 @@ class PlaceOrderFlowKafkaIntegrationTest {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         consumer = new KafkaConsumer<>(props);
-        consumer.subscribe(List.of(ORDER_CREATED_TOPIC, ORDER_CONFIRMED_TOPIC));
+        consumer.subscribe(List.of(
+                ORDER_CREATED_TOPIC,
+                ORDER_CONFIRMED_TOPIC,
+                ORDER_CANCELLED_TOPIC,
+                STOCK_UNAVAILABLE_TOPIC,
+                ORDER_CONFIRMATION_REJECTED_TOPIC));
     }
 
     @AfterEach
     void cleanup() {
         consumer.close();
-        if (orderId != null) {
-            orderRepository.findByOrderId(orderId).ifPresent(orderRepository::delete);
+        if (createdOrderId != null) {
+            orderRepository.findByOrderId(createdOrderId).ifPresent(orderRepository::delete);
         }
     }
 
@@ -147,6 +173,7 @@ class PlaceOrderFlowKafkaIntegrationTest {
                 .getResponseBody();
         var json = new String(body, StandardCharsets.UTF_8);
         orderId = JsonPath.read(json, "$.orderId");
+        createdOrderId = orderId;
         long id = ((Number) JsonPath.read(json, "$.id")).longValue();
 
         // OrderCreated on orders-checkout.order-created.event.avro.v1
@@ -198,6 +225,220 @@ class PlaceOrderFlowKafkaIntegrationTest {
                 .expectBody()
                 .jsonPath("$.status")
                 .isEqualTo("CONFIRMED");
+    }
+
+    /**
+     * S3: an order created here (not fixture ORD-003; this test is not transactional) is cancelled when
+     * StockReleased PAYMENT_DECLINED arrives, and OrderCancelled is on its topic. C-03's reason.
+     */
+    @Test
+    void stockReleasedOnKafkaCancelsTheOrder() {
+        assertFalse(
+                eventsProducer.getClass().getSimpleName().startsWith("InMemory"),
+                "the real producer must be wired, not " + eventsProducer.getClass());
+
+        String requestBody = """
+            {
+              "customerId" : "CUS-100",
+              "customerEmail" : "reader@example.com",
+              "paymentMethodId" : "PM-100",
+              "currency" : "EUR",
+              "items" : [ { "sku" : "SKU-001", "quantity" : 2, "unitPrice" : 10.50 } ],
+              "shippingAddress" : {
+                "name" : "Reader One", "line1" : "1 Main St", "city" : "Madrid",
+                "postalCode" : "28001", "country" : "ES"
+              }
+            }
+        """;
+        long startedAt = System.currentTimeMillis();
+        var body = webTestClient
+                .method(POST)
+                .uri("/api/orders/start-checkout")
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(requestBody)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(201)
+                .expectBody()
+                .returnResult()
+                .getResponseBody();
+        var json = new String(body, StandardCharsets.UTF_8);
+        orderId = JsonPath.read(json, "$.orderId");
+        createdOrderId = orderId;
+        long id = ((Number) JsonPath.read(json, "$.id")).longValue();
+
+        var created = awaitOne(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt);
+        assertEquals(orderId, created.getOrderId().toString());
+
+        // StockReleased on catalog-inventory.stock-released.event.avro.v1, as inventory would publish it
+        var released = new StockReleased();
+        released.setOrderId(orderId);
+        released.setReason(StockReleaseReason.PAYMENT_DECLINED);
+        released.setItems(List.of());
+        publish(STOCK_RELEASED_TOPIC, orderId, released);
+
+        // OrderCancelled on orders-checkout.order-cancelled.event.avro.v1
+        var cancelled = awaitOne(ORDER_CANCELLED_TOPIC, OrderCancelled.class, startedAt);
+        assertEquals(orderId, cancelled.getOrderId().toString());
+        assertEquals("PAYMENT_DECLINED", cancelled.getReason().toString());
+        assertEquals("CUS-100", cancelled.getCustomerId().toString());
+        assertEquals("reader@example.com", cancelled.getCustomerEmail().toString());
+        assertEquals(TestClock.NOW.toString(), cancelled.getCancelledAt().toString());
+        Awaitility.await()
+                .atMost(TIMEOUT)
+                .until(() ->
+                        orderRepository.findByOrderId(orderId).orElseThrow().getStatus() == OrderStatus.CANCELLED);
+        int committed = orderRepository.findByOrderId(orderId).orElseThrow().getVersion();
+        assertTrue(cancelled.getVersion() > created.getVersion(), "cancelled after created");
+        assertTrue(cancelled.getVersion() <= committed, "event " + cancelled.getVersion() + " vs row " + committed);
+        assertEquals(
+                1,
+                recordsFor(ORDER_CANCELLED_TOPIC, OrderCancelled.class, startedAt)
+                        .size());
+        assertSubjectRegistered("stockreleased");
+        assertSubjectRegistered("ordercancelled");
+
+        webTestClient
+                .method(GET)
+                .uri("/api/orders/{id}", id)
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(200)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo("CANCELLED")
+                .jsonPath("$.cancellationReason")
+                .isEqualTo("PAYMENT_DECLINED")
+                .jsonPath("$.cancelledAt")
+                .isEqualTo(TestClock.NOW.toString());
+    }
+
+    /**
+     * S2 stockGone: SKU-004 is unavailable in the inventory stub. 409, no row, one StockUnavailable, no OrderCreated.
+     */
+    @Test
+    void startCheckoutWithSku004PublishesStockUnavailable() {
+        assertFalse(
+                eventsProducer.getClass().getSimpleName().startsWith("InMemory"),
+                "the real producer must be wired, not " + eventsProducer.getClass());
+
+        String requestBody = """
+            {
+              "customerId" : "CUS-100",
+              "customerEmail" : "reader@example.com",
+              "paymentMethodId" : "PM-100",
+              "currency" : "EUR",
+              "items" : [ { "sku" : "SKU-004", "quantity" : 3, "unitPrice" : 10.50 } ],
+              "shippingAddress" : {
+                "name" : "Reader One", "line1" : "1 Main St", "city" : "Madrid",
+                "postalCode" : "28001", "country" : "ES"
+              }
+            }
+        """;
+        long before = orderRepository.count();
+        long startedAt = System.currentTimeMillis();
+        var body = webTestClient
+                .method(POST)
+                .uri("/api/orders/start-checkout")
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(requestBody)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.unavailableItems.length()")
+                .isEqualTo(1)
+                .jsonPath("$.unavailableItems[0].sku")
+                .isEqualTo("SKU-004")
+                .returnResult()
+                .getResponseBody();
+        var json = new String(body, StandardCharsets.UTF_8);
+        orderId = JsonPath.read(json, "$.orderId");
+        createdOrderId = orderId;
+
+        assertTrue(orderRepository.findByOrderId(orderId).isEmpty());
+        assertEquals(before, orderRepository.count());
+
+        // StockUnavailable on orders-checkout.stock-unavailable.event.avro.v1
+        var unavailable = awaitOne(STOCK_UNAVAILABLE_TOPIC, StockUnavailable.class, startedAt);
+        assertEquals(orderId, unavailable.getOrderId().toString());
+        assertEquals("CUS-100", unavailable.getCustomerId().toString());
+        assertEquals("reader@example.com", unavailable.getCustomerEmail().toString());
+        assertEquals(1, unavailable.getUnavailableItems().size());
+        assertEquals(
+                "SKU-004", unavailable.getUnavailableItems().get(0).getSku().toString());
+        assertEquals(3, unavailable.getUnavailableItems().get(0).getRequestedQuantity());
+        assertEquals(0, unavailable.getUnavailableItems().get(0).getAvailableQuantity());
+        assertEquals(
+                1,
+                recordsFor(STOCK_UNAVAILABLE_TOPIC, StockUnavailable.class, startedAt)
+                        .size());
+        assertEquals(
+                0,
+                recordsFor(ORDER_CREATED_TOPIC, OrderCreated.class, startedAt).size());
+        assertSubjectRegistered("stockunavailable");
+    }
+
+    /**
+     * S4 order-cancelled outcome: C-06 ORD-006 is already CANCELLED. PaymentAuthorized emits one
+     * OrderConfirmationRejected (ORDER_CANCELLED) and leaves the fixture row unchanged.
+     */
+    @Test
+    void paymentAuthorizedForOrd006PublishesOrderConfirmationRejected() {
+        assertFalse(
+                eventsProducer.getClass().getSimpleName().startsWith("InMemory"),
+                "the real producer must be wired, not " + eventsProducer.getClass());
+
+        orderId = "ORD-006";
+        long id = orderRepository.findByOrderId(orderId).orElseThrow().getId();
+        long startedAt = System.currentTimeMillis();
+
+        var payment = new PaymentAuthorized();
+        payment.setOrderId(orderId);
+        payment.setCustomerId("CUST-006");
+        payment.setAmount(29.99);
+        payment.setCurrency("EUR");
+        publish(PAYMENT_AUTHORIZED_TOPIC, orderId, payment);
+
+        // OrderConfirmationRejected on orders-checkout.order-confirmation-rejected.event.avro.v1
+        var rejected = awaitOne(ORDER_CONFIRMATION_REJECTED_TOPIC, OrderConfirmationRejected.class, startedAt);
+        assertEquals(orderId, rejected.getOrderId().toString());
+        assertEquals("CUST-006", rejected.getCustomerId().toString());
+        assertEquals("ORDER_CANCELLED", rejected.getReason().toString());
+        assertEquals(TestClock.NOW.toString(), rejected.getRejectedAt().toString());
+        assertEquals(
+                1,
+                recordsFor(ORDER_CONFIRMATION_REJECTED_TOPIC, OrderConfirmationRejected.class, startedAt)
+                        .size());
+        assertEquals(
+                0,
+                recordsFor(ORDER_CONFIRMED_TOPIC, OrderConfirmed.class, startedAt)
+                        .size());
+        assertSubjectRegistered("orderconfirmationrejected");
+
+        var persisted = orderRepository.findByOrderId(orderId).orElseThrow();
+        assertEquals(OrderStatus.CANCELLED, persisted.getStatus());
+        assertEquals("RESERVATION_EXPIRED", persisted.getCancellationReason());
+
+        webTestClient
+                .method(GET)
+                .uri("/api/orders/{id}", id)
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(200)
+                .expectBody()
+                .jsonPath("$.orderId")
+                .isEqualTo("ORD-006")
+                .jsonPath("$.status")
+                .isEqualTo("CANCELLED")
+                .jsonPath("$.cancellationReason")
+                .isEqualTo("RESERVATION_EXPIRED")
+                .jsonPath("$.confirmedAt")
+                .isEmpty();
     }
 
     private void publish(String topic, String key, Object payload) {
@@ -252,6 +493,24 @@ class PlaceOrderFlowKafkaIntegrationTest {
         if (event instanceof OrderConfirmed e) {
             return e.getOrderId().toString();
         }
+        if (event instanceof OrderCancelled e) {
+            return e.getOrderId().toString();
+        }
+        if (event instanceof StockUnavailable e) {
+            return e.getOrderId().toString();
+        }
+        if (event instanceof OrderConfirmationRejected e) {
+            return e.getOrderId().toString();
+        }
         return null;
+    }
+
+    private void assertSubjectRegistered(String subjectFragment) {
+        String subjects = RestClient.create(schemaRegistryUrl)
+                .get()
+                .uri("/subjects")
+                .retrieve()
+                .body(String.class);
+        assertTrue(subjects.contains(subjectFragment), subjects);
     }
 }
