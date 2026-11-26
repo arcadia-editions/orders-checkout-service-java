@@ -170,9 +170,10 @@ review: [ ]
       tests: OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testGetOrder_400, OrdersCheckoutApiControllerTest#getOrderTest
       blocked by: T-01
       done: grok grok-4.7
-- [/] T-24 mechanical AFK LoggingAspectConfiguration does not log StockUnavailableException (business 409 of stockGone) at ERROR; log it at DEBUG or skip it, other exceptions unchanged
+- [x] T-24 mechanical AFK LoggingAspectConfiguration does not log StockUnavailableException (business 409 of stockGone) at ERROR; log it at DEBUG or skip it, other exceptions unchanged
       fixes: .zenwave/handoff/place-order-flow/reports/review-S2-final.md (STANDARDS NOTE)
       tests: LoggingAspectConfigurationTest
+      done: grok grok-4.7
 - [/] T-25 bounded AFK Event version is the persisted one: startOrderCheckout, confirmOrder and cancelOrder map their event after the write is flushed (saveAndFlush); PlaceOrderFlowCancelledIntegrationTest flushes and clears before the final GET and asserts OrderCancelled.version == persisted version, customerId and customerEmail; remove dead OrdersCheckoutServiceMapper asOrder/update for CancelOrderInput and ConfirmOrderInput; PlaceOrderFlowKafkaIntegrationTest asserts OrderConfirmed.version == committed row version; EventsMapper asOrderConfirmed ignores shippingAddressBuilder; assertFalse instead of assertTrue(!...); spotless:apply on PlaceOrderFlowLateAuthorizationIntegrationTest, PlaceOrderFlowCancelledIntegrationTest, EventsMapper
       model: ../orders-checkout-api/domain-model.zdl:150-205
       fixes: .zenwave/handoff/place-order-flow/reports/review-S3-final.md (SHOULD FIX x2, NOTEs), review-S1-final.md (SHOULD FIX version, NOTEs), review-S4-final.md (SHOULD FIX spotless)
