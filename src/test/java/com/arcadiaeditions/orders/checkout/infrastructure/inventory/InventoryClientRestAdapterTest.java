@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
+import com.arcadiaeditions.orders.checkout.clients.inventory.InventoryApi;
 import com.arcadiaeditions.orders.checkout.core.outbound.inventory.ReserveStockItem;
 import com.arcadiaeditions.orders.checkout.core.outbound.inventory.StockReservationConfirmedResult;
 import com.arcadiaeditions.orders.checkout.core.outbound.inventory.StockReservationNotHeldResult;
@@ -24,6 +25,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.support.RestClientAdapter;
+import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 /** Request / response mapping of the REST adapter against catalog-inventory-api/openapi.yml. */
 class InventoryClientRestAdapterTest {
@@ -38,7 +41,10 @@ class InventoryClientRestAdapterTest {
     void setUp() {
         var builder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(builder).build();
-        adapter = new InventoryClientRestAdapter(builder.build());
+        var inventoryApi = HttpServiceProxyFactory.builderFor(RestClientAdapter.create(builder.build()))
+                .build()
+                .createClient(InventoryApi.class);
+        adapter = new InventoryClientRestAdapter(inventoryApi);
     }
 
     @Test

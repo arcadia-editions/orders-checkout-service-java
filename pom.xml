@@ -36,6 +36,9 @@
 		<asyncapi.client.avro.imports>classpath:com/arcadiaeditions/catalog/inventory-management/catalog-inventory/avro/StockReleaseReason.avsc,classpath:com/arcadiaeditions/catalog/inventory-management/catalog-inventory/avro/StockReleasedItem.avsc</asyncapi.client.avro.imports>
 		<!-- generated AsyncAPI SDK lives outside the hexagon: asyncapi.provider (asyncapi.yml) and asyncapi.client (asyncapi-client.yml) -->
 		<asyncApiClientApiPackage>${basePackage}.asyncapi.client</asyncApiClientApiPackage>
+		<!-- generated HTTP client of catalog-inventory-api (docs/backlog/http-clients.md) -->
+		<catalog-inventory.openapi.inputSpec>com/arcadiaeditions/catalog/inventory-management/catalog-inventory/openapi.yml</catalog-inventory.openapi.inputSpec>
+		<catalogInventoryClientPackage>${basePackage}.clients.inventory</catalogInventoryClientPackage>
 
 		<spring-boot.version>${project.parent.version}</spring-boot.version>
 		<spring-cloud.version>2025.1.4</spring-cloud.version>
@@ -336,6 +339,11 @@
 						<artifactId>service-all</artifactId>
 						<version>${orders-checkout-api.version}</version>
 					</dependency>
+					<dependency>
+						<groupId>com.arcadiaeditions.catalog.inventory-management.catalog-inventory</groupId>
+						<artifactId>service-all</artifactId>
+						<version>${catalog-inventory-api.version}</version>
+					</dependency>
 				</dependencies>
 				<executions>
 					<execution>
@@ -364,6 +372,40 @@
 								<interfaceOnly>true</interfaceOnly>
 								<skipDefaultInterface>true</skipDefaultInterface>
 								<delegatePattern>false</delegatePattern>
+								<sortParamsByRequiredFlag>false</sortParamsByRequiredFlag>
+							</configOptions>
+						</configuration>
+					</execution>
+					<execution>
+						<id>generate-catalog-inventory-client</id>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<phase>generate-sources</phase>
+						<configuration>
+							<inputSpec>${catalog-inventory.openapi.inputSpec}</inputSpec>
+							<skipIfSpecIsUnchanged>true</skipIfSpecIsUnchanged>
+							<generatorName>spring</generatorName>
+							<library>spring-http-interface</library>
+							<apiPackage>${catalogInventoryClientPackage}</apiPackage>
+							<modelPackage>${catalogInventoryClientPackage}.dtos</modelPackage>
+							<modelNameSuffix>DTO</modelNameSuffix>
+							<addCompileSourceRoot>true</addCompileSourceRoot>
+							<generateSupportingFiles>false</generateSupportingFiles>
+							<!-- only what this service calls: reserveStock and confirmStockReservation (tag Inventory) -->
+							<apisToGenerate>Inventory</apisToGenerate>
+							<openapiNormalizer>FILTER=operationId:reserveStock|confirmStockReservation</openapiNormalizer>
+							<modelsToGenerate>ReserveStockInput,ReserveStockItemInput,ReserveStockResult,ReserveStockOutcome,StockReservedResult,StockReservedLine,StockUnavailableResult,StockUnavailableLine,ConfirmStockReservationInput,ConfirmStockReservationResult,ConfirmStockReservationOutcome,StockReservationConfirmedResult,StockReservationNotHeldResult</modelsToGenerate>
+							<typeMappings>
+								<typeMapping>Double=java.math.BigDecimal</typeMapping>
+							</typeMappings>
+							<configOptions>
+								<useSpringBoot3>true</useSpringBoot3>
+								<useJakartaEe>true</useJakartaEe>
+								<documentationProvider>none</documentationProvider>
+								<openApiNullable>false</openApiNullable>
+								<useOptional>false</useOptional>
+								<useTags>true</useTags>
 								<sortParamsByRequiredFlag>false</sortParamsByRequiredFlag>
 							</configOptions>
 						</configuration>

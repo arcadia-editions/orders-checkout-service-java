@@ -26,6 +26,8 @@ class ArchitectureTest {
      * <li>Generated AsyncAPI SDK ({@code asyncapi.provider}, {@code asyncapi.client}) and Avro models ({@code events.avro})
      * sit outside the hexagon. CoreApplication and Adapters may access both. The SDK may access the Avro models
      * (producer payloads). Domain, inbound and outbound ports may not.</li>
+     * <li>Generated OpenAPI HTTP clients ({@code clients}) sit outside the hexagon too: only Infrastructure (and Config)
+     * may access them.</li>
      * </ul>
      */
     @ArchTest
@@ -46,13 +48,14 @@ class ArchitectureTest {
         .optionalLayer("Utils").definedBy("..utils..")
         .optionalLayer("AsyncApiSdk").definedBy("..asyncapi..")
         .optionalLayer("EventsAvro").definedBy("..events.avro..")
+        .optionalLayer("HttpClients").definedBy("..clients..")
 
         .whereLayer("Utils").mayOnlyBeAccessedByLayers("Any")
         .whereLayer("Config").mayNotBeAccessedByAnyLayer()
         .whereLayer("CoreApplication").mayNotBeAccessedByAnyLayer()
         .whereLayer("CoreApplication").mayOnlyAccessLayers("Utils", "Core", "CoreInbound", "CoreOutbound", "Domain", "AsyncApiSdk", "EventsAvro")
         .whereLayer("Infrastructure").mayOnlyBeAccessedByLayers("Config", "Core")
-        .whereLayer("Infrastructure").mayOnlyAccessLayers("CoreOutbound", "Models", "Utils")
+        .whereLayer("Infrastructure").mayOnlyAccessLayers("CoreOutbound", "Models", "Utils", "HttpClients")
         .whereLayer("CoreInbound").mayOnlyAccessLayers("Models")
         .whereLayer("CoreInbound").mayOnlyBeAccessedByLayers("CoreApplication", "Adapters")
         .whereLayer("CoreOutbound").mayOnlyAccessLayers("Models")
@@ -63,6 +66,8 @@ class ArchitectureTest {
         .whereLayer("AsyncApiSdk").mayOnlyAccessLayers("EventsAvro")
         .whereLayer("EventsAvro").mayOnlyBeAccessedByLayers("CoreApplication", "Adapters", "AsyncApiSdk")
         .whereLayer("EventsAvro").mayOnlyAccessLayers("EventsAvro")
+        .whereLayer("HttpClients").mayOnlyBeAccessedByLayers("Infrastructure")
+        .whereLayer("HttpClients").mayOnlyAccessLayers("HttpClients")
 
         .ignoreDependency(resideInAPackage("..config.."), alwaysTrue())
         ;
