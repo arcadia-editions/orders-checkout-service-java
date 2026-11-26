@@ -106,7 +106,7 @@ review: [ ]
       blocked by: T-10
       done: claude-code claude-sonnet
 
-- [ ] T-22 mechanical AFK S2 review fixes: remove the dead generated EventsMapper.asStockUnavailable(Order); PlaceOrderFlowStockGoneIntegrationTest checks "no OrderCreated" with the typed getOrderId() filter like createdFor
+- [/] T-22 mechanical AFK S2 review fixes: remove the dead generated EventsMapper.asStockUnavailable(Order); PlaceOrderFlowStockGoneIntegrationTest checks "no OrderCreated" with the typed getOrderId() filter like createdFor
       fixes: .zenwave/handoff/place-order-flow/reports/review-S2.md (NOTEs)
       tests: OrdersCheckoutServiceTest, PlaceOrderFlowStockGoneIntegrationTest
 
