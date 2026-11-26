@@ -154,11 +154,12 @@ review: [ ]
       tests: OrdersCheckoutServiceTest#confirmOrderRejectedTest
       blocked by: T-07
       done: claude-code claude-sonnet
-- [/] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
+- [x] T-16 bounded AFK Flow test late authorization (orders side): PaymentAuthorized for C-05 and C-06 emits OrderConfirmationRejected and leaves the order unchanged
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164
       test data: data.sql (C-05, C-06)
       tests: PlaceOrderFlowLateAuthorizationIntegrationTest
       blocked by: T-08, T-15
+      done: claude-code claude-sonnet
 
 ## S5 polish
 review: [ ]
