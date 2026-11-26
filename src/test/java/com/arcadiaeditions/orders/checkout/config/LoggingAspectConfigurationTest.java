@@ -26,7 +26,9 @@ class LoggingAspectConfigurationTest {
 
         assertEquals(1, events.size());
         assertEquals(Level.DEBUG, events.get(0).getLevel());
-        assertEquals("Exception in startOrderCheckout() with cause = NULL", events.get(0).getFormattedMessage());
+        assertEquals(
+                "Exception in startOrderCheckout() with cause = NULL",
+                events.get(0).getFormattedMessage());
         assertNull(events.get(0).getThrowableProxy());
     }
 
@@ -40,7 +42,9 @@ class LoggingAspectConfigurationTest {
         assertEquals(
                 "Exception in startOrderCheckout() with cause = 'NULL' and exception = '" + thrown.getMessage() + "'",
                 events.get(0).getFormattedMessage());
-        assertEquals(StockUnavailableException.class.getName(), events.get(0).getThrowableProxy().getClassName());
+        assertEquals(
+                StockUnavailableException.class.getName(),
+                events.get(0).getThrowableProxy().getClassName());
     }
 
     @Test
@@ -67,7 +71,9 @@ class LoggingAspectConfigurationTest {
                 "Exception in startOrderCheckout() with cause = '" + thrown.getCause() + "' and exception = '"
                         + thrown.getMessage() + "'",
                 events.get(0).getFormattedMessage());
-        assertEquals(IllegalStateException.class.getName(), events.get(0).getThrowableProxy().getClassName());
+        assertEquals(
+                IllegalStateException.class.getName(),
+                events.get(0).getThrowableProxy().getClassName());
     }
 
     private static List<ILoggingEvent> capture(String profile, Throwable thrown) {
@@ -85,8 +91,7 @@ class LoggingAspectConfigurationTest {
         try {
             aspect.logAfterThrowing(new MethodJoinPoint("startOrderCheckout"), thrown);
             return List.copyOf(appender.list);
-        }
-        finally {
+        } finally {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);
             logger.setAdditive(additive);
