@@ -194,7 +194,7 @@ review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S6-fin
       done: claude-code claude-sonnet
 
 ## S7 person requests (after S6)
-review: [ ]
+review: [x] claude-sonnet, .zenwave/handoff/place-order-flow/reports/review-S7.md
 
 - [x] T-23 advanced AFK Confluent wire format for Avro: KafkaAvroSerializer/Deserializer (native encoding/decoding, TopicNameStrategy subjects) instead of Spring Cloud Stream's Avro converter, so payments and inventory (Confluent serde) can read and write the same messages; needs io.confluent:kafka-avro-serializer and the Confluent Maven repository in pom.xml
       model: ../api-contract-commons/asyncapi-master.yml (confluentSchemaRegistry), ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
