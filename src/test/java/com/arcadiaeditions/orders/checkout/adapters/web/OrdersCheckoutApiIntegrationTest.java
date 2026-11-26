@@ -185,13 +185,18 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
     }
 
     /**
-     * Test: getOrder for OK.
+     * getOrder 200: CONFIRMED (C-01), CREATED (C-02), CANCELLED (C-06).
+     * Numeric ids from data.sql (sequence step 50): 1, 51, 251.
      */
     @Test
     public void testGetOrder_200() {
-        var id = 1L; // data.sql C-01 / data/jpa/Order/1.json: ORD-001 CONFIRMED
+        assertGetOrder(1L, "ORD-001", "CONFIRMED", null);
+        assertGetOrder(51L, "ORD-002", "CREATED", null);
+        assertGetOrder(251L, "ORD-006", "CANCELLED", "RESERVATION_EXPIRED");
+    }
 
-        webTestClient
+    private void assertGetOrder(long id, String orderId, String status, String cancellationReason) {
+        var body = webTestClient
                 .method(GET)
                 .uri("/api/orders/{id}", id)
                 .accept(MediaType.APPLICATION_JSON)
@@ -206,9 +211,9 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
                 .jsonPath("$.version")
                 .isNotEmpty()
                 .jsonPath("$.orderId")
-                .isEqualTo("ORD-001")
+                .isEqualTo(orderId)
                 .jsonPath("$.status")
-                .isEqualTo("CONFIRMED")
+                .isEqualTo(status)
                 .jsonPath("$.customerId")
                 .isNotEmpty()
                 .jsonPath("$.customerEmail")
@@ -242,17 +247,36 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
                 .jsonPath("$.currency")
                 .isNotEmpty()
                 .jsonPath("$.createdAt")
-                .isNotEmpty()
-                .jsonPath("$.confirmedAt")
                 .isNotEmpty();
+        if ("CONFIRMED".equals(status)) {
+            body.jsonPath("$.confirmedAt").isNotEmpty();
+        }
+        if (cancellationReason != null) {
+            body.jsonPath("$.cancellationReason").isEqualTo(cancellationReason);
+        }
     }
 
     /**
-     * Test: getOrder for Invalid request.
+     * openapi.yml GET /orders/{id} responds 400 Invalid request. id is int64, so a non-numeric id is 400.
      */
     @Test
     public void testGetOrder_400() {
-        var id = "";
+        webTestClient
+                .method(GET)
+                .uri("/api/orders/{id}", "not-a-number")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(400);
+    }
+
+    /**
+     * Unknown numeric id. data.sql: not found -> any id not listed (e.g. 999).
+     * openapi.yml does not declare 404; the controller already answers notFound().
+     */
+    @Test
+    public void testGetOrder_404() {
+        var id = 999L;
 
         webTestClient
                 .method(GET)
@@ -260,6 +284,6 @@ public class OrdersCheckoutApiIntegrationTest extends BaseWebTestClientTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus()
-                .isEqualTo(400);
+                .isEqualTo(404);
     }
 }

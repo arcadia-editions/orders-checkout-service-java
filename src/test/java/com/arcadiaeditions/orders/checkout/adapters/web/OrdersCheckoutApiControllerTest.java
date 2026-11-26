@@ -60,9 +60,23 @@ public class OrdersCheckoutApiControllerTest {
 
     @Test
     public void getOrderTest() {
-        Long id = 1L; // fixtures: data/jpa/Order/1.json, C-01 ORD-001
+        // data/jpa/Order mirrors of data.sql: C-01 id 1, C-02 id 51, C-06 id 251
+        assertGetOrder(1L, "ORD-001", OrderStatusDTO.CONFIRMED, null);
+        assertGetOrder(51L, "ORD-002", OrderStatusDTO.CREATED, null);
+        assertGetOrder(251L, "ORD-006", OrderStatusDTO.CANCELLED, "RESERVATION_EXPIRED");
+
+        var missing = controller.getOrder(999L);
+        Assertions.assertEquals(404, missing.getStatusCode().value());
+    }
+
+    private void assertGetOrder(Long id, String orderId, OrderStatusDTO status, String cancellationReason) {
         var response = controller.getOrder(id);
         Assertions.assertEquals(200, response.getStatusCode().value());
-        Assertions.assertEquals("ORD-001", response.getBody().getOrderId());
+        var body = response.getBody();
+        Assertions.assertEquals(orderId, body.getOrderId());
+        Assertions.assertEquals(status, body.getStatus());
+        if (cancellationReason != null) {
+            Assertions.assertEquals(cancellationReason, body.getCancellationReason());
+        }
     }
 }
