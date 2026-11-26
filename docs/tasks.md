@@ -185,7 +185,7 @@ review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S5-fin
       done: grok grok-4.7
 
 ## S6 check-mode gaps
-review: [ ]
+review: [x] claude-opus, .zenwave/handoff/place-order-flow/reports/review-S6-final.md
 
 - [x] T-27 mechanical AFK Kafka wiring of the cancelled, stockGone and late-authorization paths: StockReleased on catalog-inventory.stock-released.event.avro.v1 reaches cancelOrder (stock-released-event-v1-in-0 started in the test) and OrderCancelled lands on orders-checkout.order-cancelled.event.avro.v1; start-checkout with SKU-004 puts StockUnavailable on orders-checkout.stock-unavailable.event.avro.v1; PaymentAuthorized for ORD-006 puts OrderConfirmationRejected on orders-checkout.order-confirmation-rejected.event.avro.v1
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:88-92, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:155-164, ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:305-309, ../orders-checkout-api/domain-model.zdl:142, ../orders-checkout-api/asyncapi.yml, ../orders-checkout-api/asyncapi-client.yml
