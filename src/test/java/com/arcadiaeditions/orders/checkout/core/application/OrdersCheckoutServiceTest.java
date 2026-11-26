@@ -74,6 +74,9 @@ class OrdersCheckoutServiceTest {
         assertEquals(99.97, event.getAmount(), 0.0001);
         assertEquals("EUR", event.getCurrency().toString());
         assertNotNull(event.getVersion());
+        assertEquals("CUST-100", event.getCustomerId().toString());
+        assertEquals("customer100@example.com", event.getCustomerEmail().toString());
+        assertEquals("PM-100", event.getPaymentMethodId().toString());
 
         var reserved = context.inventoryClient().reserveStockCalls();
         assertEquals(1, reserved.size());
