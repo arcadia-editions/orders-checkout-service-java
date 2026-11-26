@@ -99,7 +99,7 @@ review: [ ]
 ## S2 stockGone
 path: StartOrderCheckout > startOrderCheckout > reserveStock[StockUnavailableResult] > StockUnavailable
       > sendStockUnavailableNotification > end stockGone
-review: [ ]
+review: [x] claude-opus (fix round), .zenwave/handoff/place-order-flow/reports/review-S2-final.md
 
 - [x] T-10 bounded AFK startOrderCheckout unavailable: persist nothing, emit StockUnavailable (orderId, customer, unavailableItems from the result), answer 409 with StockUnavailable body
       model: ../arcadia-editions-architecture/business-flows/place-order-flow.zfl:88-92, ../orders-checkout-api/domain-model.zdl:126-130, ../orders-checkout-api/domain-model.zdl:162-172, ../orders-checkout-api/openapi-overlay.yml
@@ -170,3 +170,6 @@ review: [ ]
       tests: OrdersCheckoutApiIntegrationTest#testGetOrder_200, OrdersCheckoutApiIntegrationTest#testGetOrder_400, OrdersCheckoutApiControllerTest#getOrderTest
       blocked by: T-01
       done: grok grok-4.7
+- [ ] T-24 mechanical AFK LoggingAspectConfiguration does not log StockUnavailableException (business 409 of stockGone) at ERROR; log it at DEBUG or skip it, other exceptions unchanged
+      fixes: .zenwave/handoff/place-order-flow/reports/review-S2-final.md (STANDARDS NOTE)
+      tests: LoggingAspectConfigurationTest
